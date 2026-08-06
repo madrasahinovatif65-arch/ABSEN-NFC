@@ -419,6 +419,7 @@ function App() {
           className="absolute left-[-9999px] opacity-0"
           autoFocus
           autoComplete="off" 
+          inputMode="none"
         />
 
         {/* Layout Split */}
