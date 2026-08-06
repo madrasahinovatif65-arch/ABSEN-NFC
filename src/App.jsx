@@ -94,24 +94,29 @@ function App() {
 
   useEffect(() => {
     resetIdleTimer();
-    const handleActivity = () => {
+    const handleActivity = (e) => {
       resetIdleTimer();
+      // Mencegah browser memindahkan fokus saat disentuh, sehingga keyboard virtual TIDAK AKAN pernah muncul
+      if (e && (e.type === 'touchstart' || e.type === 'mousedown')) {
+        e.preventDefault();
+      }
       if (inputRef.current && document.activeElement !== inputRef.current) {
         inputRef.current.focus();
       }
     };
 
+    // Gunakan passive: false agar preventDefault bisa berfungsi pada touchstart
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('keydown', handleActivity);
-    window.addEventListener('click', handleActivity);
-    window.addEventListener('touchstart', handleActivity); // untuk mobile
+    window.addEventListener('mousedown', handleActivity);
+    window.addEventListener('touchstart', handleActivity, { passive: false }); 
     
     if (inputRef.current) inputRef.current.focus();
 
     return () => {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
-      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('mousedown', handleActivity);
       window.removeEventListener('touchstart', handleActivity);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
@@ -144,20 +149,31 @@ function App() {
         todayStart.setHours(0, 0, 0, 0);
         const todayISO = todayStart.toISOString();
 
-        const newHist = { ...historyLokal.current };
+        // Mulai dari kosong agar data Supabase menjadi sumber kebenaran utama saat refresh
+        const freshHist = {}; 
         const tables = ['absensi_datang', 'absensi_pulang', 'absensi_guru_datang', 'absensi_guru_pulang'];
         
-        for (const tbl of tables) {
-          const resAbsen = await supabase.from(tbl).select('rfid_uid, jenis_absen').gte('waktu', todayISO);
-          if (resAbsen.data) {
-             resAbsen.data.forEach(row => {
-                const jenis = (row.jenis_absen === "Datang") ? "datang" : "pulang";
-                newHist[`${row.rfid_uid}_${jenis}`] = true;
-             });
+        let fetchHistorySuccess = true;
+        try {
+          for (const tbl of tables) {
+            const resAbsen = await supabase.from(tbl).select('rfid_uid, jenis_absen').gte('waktu', todayISO);
+            if (resAbsen.error) throw resAbsen.error;
+            if (resAbsen.data) {
+               resAbsen.data.forEach(row => {
+                  const jenis = (row.jenis_absen === "Datang") ? "datang" : "pulang";
+                  freshHist[`${row.rfid_uid}_${jenis}`] = true;
+               });
+            }
           }
+        } catch (e) {
+          fetchHistorySuccess = false;
+          console.error("Gagal ambil history Supabase:", e);
         }
         
-        saveHistory(newHist, new Date().toDateString());
+        // Jika berhasil ambil dari server, timpa cache lokal. Jika gagal (offline), pertahankan cache lokal.
+        if (fetchHistorySuccess) {
+          saveHistory(freshHist, new Date().toDateString());
+        }
 
         const total = (resMurid.data?.length || 0) + (resGuru.data?.length || 0);
         setSyncStatus(`✓ Sistem Siap (${total} Data)`);
