@@ -483,7 +483,10 @@ function App() {
               </div>
             </div>
             
-            <div className="w-full bg-gradient-to-b from-[#22a44d] to-[#067734] rounded-[1.2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-[#22c55e33] transform transition-transform duration-300 hover:scale-[1.02]">
+            <div 
+              className="w-full rounded-[1.2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-[#22c55e33] transform transition-transform duration-300 hover:scale-[1.02]"
+              style={{ background: 'linear-gradient(to bottom, #22a44d, #067734)' }}
+            >
               <div className="text-[7.5vw] font-bold text-white tracking-[0.05em] leading-none font-mono drop-shadow-sm">
                 {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
