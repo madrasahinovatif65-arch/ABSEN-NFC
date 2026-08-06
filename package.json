@@ -16,6 +16,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@csstools/postcss-cascade-layers": "^6.0.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
