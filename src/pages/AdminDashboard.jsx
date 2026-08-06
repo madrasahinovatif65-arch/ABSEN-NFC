@@ -6,7 +6,6 @@ import DataTable from '../components/DataTable';
 
 function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
   if (!isAuthenticated) {
@@ -14,11 +13,11 @@ function AdminDashboard() {
   }
 
   const navItems = [
-    { path: '/admin', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-    { path: '/admin/murid', icon: <Users size={20} />, label: 'Data Murid' },
-    { path: '/admin/guru', icon: <UserSquare2 size={20} />, label: 'Data Guru' },
-    { path: '/admin/absen-murid', icon: <Clock size={20} />, label: 'Absen Murid' },
-    { path: '/admin/absen-guru', icon: <History size={20} />, label: 'Absen Guru' },
+    { path: '/admin', icon: <LayoutDashboard size={20} />, label: 'Dashboard', desc: 'Halaman Utama Admin' },
+    { path: '/admin/murid', icon: <Users size={20} />, label: 'Data Murid', desc: 'Kelola Master Murid' },
+    { path: '/admin/guru', icon: <UserSquare2 size={20} />, label: 'Data Guru', desc: 'Kelola Master Guru' },
+    { path: '/admin/absen-murid', icon: <Clock size={20} />, label: 'Absen Murid', desc: 'Log Kehadiran Murid' },
+    { path: '/admin/absen-guru', icon: <History size={20} />, label: 'Absen Guru', desc: 'Log Kehadiran Guru' },
   ];
 
   return (
@@ -26,29 +25,22 @@ function AdminDashboard() {
       
       {/* Mobile Header */}
       <div className="md:hidden absolute top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-20 shadow-sm">
-        <div className="flex items-center gap-3">
+        <Link to="/admin" className="flex items-center gap-3 active:opacity-70 transition-opacity">
           <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 font-black text-sm">
-            A
+            <LayoutDashboard size={16} />
           </div>
           <h1 className="font-bold text-slate-800">Panel Admin</h1>
-        </div>
-        <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
-          <Menu size={24} />
-        </button>
+        </Link>
+        <Link to="/" className="p-2 text-red-500 hover:bg-red-50 rounded-lg active:bg-red-100 transition-colors flex items-center gap-2 text-sm font-semibold">
+          <LogOut size={20} />
+          <span className="sr-only">Keluar</span>
+        </Link>
       </div>
 
-      {/* Sidebar Overlay for Mobile */}
-      {sidebarOpen && (
-        <div 
-          className="md:hidden fixed inset-0 bg-slate-900/50 z-30 transition-opacity" 
-          onClick={() => setSidebarOpen(false)} 
-        />
-      )}
-
-      {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm z-40`}>
+      {/* Sidebar (Desktop Only) */}
+      <div className="hidden md:flex relative w-64 bg-white border-r border-slate-200 flex-col shadow-sm z-10">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <div className="flex items-center gap-3">
+          <Link to="/admin" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-black text-xl">
               A
             </div>
@@ -56,10 +48,7 @@ function AdminDashboard() {
               <h1 className="font-bold text-slate-800 leading-tight">Panel Admin</h1>
               <p className="text-xs text-slate-500">Madrasah Inovatif</p>
             </div>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden p-2 text-slate-400 hover:text-slate-600">
-            <X size={20} />
-          </button>
+          </Link>
         </div>
         
         <nav className="flex-1 p-4 flex flex-col gap-2 overflow-y-auto">
@@ -67,7 +56,6 @@ function AdminDashboard() {
             <Link 
               key={item.path} 
               to={item.path}
-              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${
                 location.pathname === item.path 
                 ? 'bg-emerald-50 text-emerald-600' 
@@ -108,15 +96,38 @@ function AdminDashboard() {
 }
 
 function WelcomeDashboard() {
+  const menus = [
+    { path: '/admin/murid', icon: <Users size={32} />, label: 'Data Murid', desc: 'Kelola database siswa', color: 'bg-blue-100 text-blue-600' },
+    { path: '/admin/guru', icon: <UserSquare2 size={32} />, label: 'Data Guru', desc: 'Kelola database guru', color: 'bg-indigo-100 text-indigo-600' },
+    { path: '/admin/absen-murid', icon: <Clock size={32} />, label: 'Absen Murid', desc: 'Rekap kehadiran siswa', color: 'bg-emerald-100 text-emerald-600' },
+    { path: '/admin/absen-guru', icon: <History size={32} />, label: 'Absen Guru', desc: 'Rekap kehadiran guru', color: 'bg-teal-100 text-teal-600' },
+  ];
+
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center">
-      <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-6">
-        <LayoutDashboard size={48} />
+    <div className="h-full flex flex-col items-center justify-center text-center p-4">
+      <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-6 shadow-sm rotate-3">
+        <LayoutDashboard size={40} className="-rotate-3" />
       </div>
-      <h2 className="text-3xl font-black text-slate-800 mb-2">Selamat Datang di Panel Admin</h2>
-      <p className="text-slate-500 text-lg max-w-md">
-        Pilih menu di sebelah kiri untuk mengelola data master murid, guru, atau melihat log absensi secara real-time.
+      <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2">Selamat Datang di Panel Admin</h2>
+      <p className="text-slate-500 text-sm md:text-base max-w-md mb-10">
+        Pilih menu di bawah ini untuk mengelola data master atau melihat log absensi secara real-time.
       </p>
+
+      <div className="grid grid-cols-2 gap-4 w-full max-w-2xl">
+        {menus.map(menu => (
+          <Link 
+            key={menu.path} 
+            to={menu.path}
+            className="flex flex-col items-center p-6 bg-white border border-slate-200 rounded-3xl shadow-sm hover:shadow-md hover:border-emerald-200 transition-all active:scale-[0.98] group"
+          >
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${menu.color}`}>
+              {menu.icon}
+            </div>
+            <h3 className="font-bold text-slate-800 mb-1">{menu.label}</h3>
+            <p className="text-xs text-slate-500 hidden md:block">{menu.desc}</p>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
