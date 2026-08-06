@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Plus, Trash2, Edit2, Search, X, Loader2, ScanLine } from 'lucide-react';
 
-function DataTable({ table, title, isLog = false }) {
+function DataTable({ table, masterTable, title, isLog = false }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterKelas, setFilterKelas] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,7 +23,7 @@ function DataTable({ table, title, isLog = false }) {
 
   useEffect(() => {
     fetchData();
-  }, [table]);
+  }, [table, selectedDate, masterTable]);
 
   useEffect(() => {
     if (isModalOpen && isScanning && scanInputRef.current) {
@@ -33,32 +34,63 @@ function DataTable({ table, title, isLog = false }) {
   const fetchData = async () => {
     setLoading(true);
     
-    let combinedResult = [];
-    
-    // Support array of tables (e.g. for merging datang & pulang)
-    const tablesToFetch = Array.isArray(table) ? table : [table];
-    
-    for (const tbl of tablesToFetch) {
-      let query = supabase.from(tbl).select('*');
-      if (isLog) {
-        query = query.order('waktu', { ascending: false }).limit(100);
-      } else {
-        query = query.order('nama', { ascending: true });
-      }
-      const { data: result, error } = await query;
-      if (!error && result) {
-        combinedResult = [...combinedResult, ...result];
-      }
-    }
+    if (isLog && masterTable) {
+      let masterData = [];
+      let logData = [];
+      
+      // Fetch Master Data
+      const { data: mData } = await supabase.from(masterTable).select('*');
+      if (mData) masterData = mData;
 
-    if (isLog) {
-      // Sort combined logs by time descending
-      combinedResult.sort((a, b) => new Date(b.waktu) - new Date(a.waktu));
-      // Limit combined results to 200
-      combinedResult = combinedResult.slice(0, 200);
+      // Fetch Logs for selected Date
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      const tablesToFetch = Array.isArray(table) ? table : [table];
+      for (const tbl of tablesToFetch) {
+        const { data: lData } = await supabase.from(tbl)
+          .select('*')
+          .gte('waktu', startOfDay.toISOString())
+          .lte('waktu', endOfDay.toISOString());
+        if (lData) logData = [...logData, ...lData];
+      }
+
+      // Group logs by uid
+      const groupedLogs = {};
+      logData.forEach(log => {
+        const uid = log.rfid_uid;
+        if (!groupedLogs[uid]) groupedLogs[uid] = { datang: null, pulang: null };
+        if (log.jenis_absen === 'Datang' || log.jenis_absen === 'Terlambat') {
+          if (!groupedLogs[uid].datang || new Date(log.waktu) < new Date(groupedLogs[uid].datang.waktu)) {
+            groupedLogs[uid].datang = log;
+          }
+        } else if (log.jenis_absen === 'Pulang') {
+          if (!groupedLogs[uid].pulang || new Date(log.waktu) > new Date(groupedLogs[uid].pulang.waktu)) {
+            groupedLogs[uid].pulang = log;
+          }
+        }
+      });
+
+      // Merge with master
+      const combined = masterData.map(person => {
+        const uid = person.rfid_uid;
+        return {
+          ...person,
+          datang: groupedLogs[uid]?.datang || null,
+          pulang: groupedLogs[uid]?.pulang || null,
+        };
+      });
+      
+      setData(combined);
+    } else {
+      // Regular Master Data Fetching
+      const targetTable = Array.isArray(table) ? table[0] : table;
+      const { data: result } = await supabase.from(targetTable).select('*').order('nama', { ascending: true });
+      if (result) setData(result);
     }
     
-    setData(combinedResult);
     setLoading(false);
   };
 
@@ -91,7 +123,7 @@ function DataTable({ table, title, isLog = false }) {
   const handleDelete = async (id) => {
     if (window.confirm("Yakin ingin menghapus data ini?")) {
       setLoading(true);
-      const targetTable = Array.isArray(table) ? table[0] : table; // For logs, delete might be complex, but they shouldn't delete logs from UI anyway
+      const targetTable = Array.isArray(table) ? table[0] : table;
       await supabase.from(targetTable).delete().eq('rfid_uid', id);
       fetchData();
     }
@@ -121,9 +153,30 @@ function DataTable({ table, title, isLog = false }) {
     const matchesSearch = (row.nama?.toLowerCase() || '').includes(search.toLowerCase()) || 
                           (row.rfid_uid?.toLowerCase() || '').includes(search.toLowerCase());
     const matchesKelas = filterKelas === '' || row.detail === filterKelas;
-    const matchesStatus = filterStatus === '' || (!isLog) || (isLog && row.jenis_absen === filterStatus);
+    
+    let matchesStatus = true;
+    if (isLog && filterStatus !== '') {
+      const hasDatang = !!row.datang;
+      const hasPulang = !!row.pulang;
+      const isTerlambat = row.datang?.jenis_absen === 'Terlambat';
+      
+      if (filterStatus === 'Hadir Tepat Waktu') matchesStatus = hasDatang && !isTerlambat;
+      if (filterStatus === 'Terlambat') matchesStatus = isTerlambat;
+      if (filterStatus === 'Belum Tap Pulang') matchesStatus = hasDatang && !hasPulang;
+      if (filterStatus === 'Tidak Tap Absen') matchesStatus = !hasDatang && !hasPulang;
+    }
+    
     return matchesSearch && matchesKelas && matchesStatus;
   }).sort((a, b) => {
+    if (isLog && (sortConfig.key === 'waktu_datang' || sortConfig.key === 'waktu_pulang')) {
+      const aTime = sortConfig.key === 'waktu_datang' ? a.datang?.waktu : a.pulang?.waktu;
+      const bTime = sortConfig.key === 'waktu_datang' ? b.datang?.waktu : b.pulang?.waktu;
+      if (!aTime && !bTime) return 0;
+      if (!aTime) return sortConfig.direction === 'asc' ? 1 : -1;
+      if (!bTime) return sortConfig.direction === 'asc' ? -1 : 1;
+      return sortConfig.direction === 'asc' ? (new Date(aTime) - new Date(bTime)) : (new Date(bTime) - new Date(aTime));
+    }
+    
     if (!a[sortConfig.key]) return 1;
     if (!b[sortConfig.key]) return -1;
     
@@ -142,7 +195,6 @@ function DataTable({ table, title, isLog = false }) {
   };
 
   const uniqueKelas = [...new Set(data.map(row => row.detail))].filter(Boolean).sort();
-  const uniqueStatus = isLog ? [...new Set(data.map(row => row.jenis_absen))].filter(Boolean).sort() : [];
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
@@ -172,14 +224,26 @@ function DataTable({ table, title, isLog = false }) {
           </select>
 
           {isLog && (
-            <select 
-              value={filterStatus} 
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm bg-white cursor-pointer"
-            >
-              <option value="">Semua Status Absen</option>
-              {uniqueStatus.map((f, i) => <option key={i} value={f}>{f}</option>)}
-            </select>
+            <>
+              <select 
+                value={filterStatus} 
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm bg-white cursor-pointer"
+              >
+                <option value="">Semua Status Absen</option>
+                <option value="Hadir Tepat Waktu">Hadir Tepat Waktu</option>
+                <option value="Terlambat">Terlambat</option>
+                <option value="Belum Tap Pulang">Belum Tap Pulang</option>
+                <option value="Tidak Tap Absen">Tidak Tap Absen</option>
+              </select>
+              
+              <input 
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm bg-white cursor-pointer font-semibold text-slate-700 shadow-sm"
+              />
+            </>
           )}
           
           {!isLog && (
@@ -209,11 +273,17 @@ function DataTable({ table, title, isLog = false }) {
                 <th onClick={() => handleSort('nama')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
                   Nama <SortIcon columnKey="nama" />
                 </th>
-                <th onClick={() => handleSort(isLog ? 'jenis_absen' : 'detail')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
-                  {isLog ? 'Keterangan / Absen' : 'Detail / Kelas'} <SortIcon columnKey={isLog ? 'jenis_absen' : 'detail'} />
+                <th onClick={() => handleSort('detail')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                  {isLog ? 'Kelas / Jabatan' : 'Detail / Kelas'} <SortIcon columnKey="detail" />
                 </th>
-                {isLog && <th onClick={() => handleSort('waktu')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">Waktu <SortIcon columnKey="waktu" /></th>}
-                {!isLog && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right">Aksi</th>}
+                {isLog ? (
+                  <>
+                    <th onClick={() => handleSort('waktu_datang')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">Waktu Datang <SortIcon columnKey="waktu_datang" /></th>
+                    <th onClick={() => handleSort('waktu_pulang')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">Waktu Pulang <SortIcon columnKey="waktu_pulang" /></th>
+                  </>
+                ) : (
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right">Aksi</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -221,15 +291,30 @@ function DataTable({ table, title, isLog = false }) {
                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs text-slate-500">{row.rfid_uid}</td>
                   <td className="px-6 py-4 font-semibold text-slate-800">{row.nama}</td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {isLog ? (
-                      <span className={`px-2 py-1 rounded-md text-xs font-bold ${row.jenis_absen === 'Datang' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {row.jenis_absen}
-                      </span>
-                    ) : row.detail}
-                  </td>
-                  {isLog && <td className="px-6 py-4 text-sm text-slate-500">{new Date(row.waktu).toLocaleString('id-ID')}</td>}
-                  {!isLog && (
+                  <td className="px-6 py-4 text-sm text-slate-600">{row.detail}</td>
+                  {isLog ? (
+                    <>
+                      <td className="px-6 py-4 text-sm">
+                        {row.datang ? (
+                          <div className="flex flex-col">
+                            <span className="text-emerald-700 font-bold">{new Date(row.datang.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                            {row.datang.jenis_absen === 'Terlambat' && <span className="text-[10px] text-amber-700 font-bold bg-amber-100 rounded-md px-2 py-0.5 w-max mt-1 uppercase tracking-wider">Terlambat</span>}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-semibold bg-slate-100 rounded-md px-2 py-1 text-xs">Tidak Tap Absen</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {row.pulang ? (
+                          <span className="text-blue-700 font-bold">{new Date(row.pulang.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                        ) : row.datang ? (
+                          <span className="text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-md px-2 py-1 text-xs">Belum Tap Pulang</span>
+                        ) : (
+                          <span className="text-slate-400 font-semibold bg-slate-100 rounded-md px-2 py-1 text-xs">Tidak Tap Absen</span>
+                        )}
+                      </td>
+                    </>
+                  ) : (
                     <td className="px-6 py-4 text-right">
                       <button onClick={() => openEdit(row)} className="text-blue-500 hover:text-blue-700 p-2"><Edit2 size={16} /></button>
                       <button onClick={() => handleDelete(row.rfid_uid)} className="text-red-500 hover:text-red-700 p-2 ml-2"><Trash2 size={16} /></button>
@@ -237,7 +322,7 @@ function DataTable({ table, title, isLog = false }) {
                   )}
                 </tr>
               )) : (
-                <tr><td colSpan={5} className="text-center py-10 text-slate-500">Tidak ada data ditemukan.</td></tr>
+                <tr><td colSpan={isLog ? 5 : 4} className="text-center py-10 text-slate-500">Tidak ada data ditemukan.</td></tr>
               )}
             </tbody>
           </table>
