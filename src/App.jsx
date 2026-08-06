@@ -452,7 +452,7 @@ function App() {
       <div className={`absolute inset-0 bg-black pointer-events-none z-50 transition-opacity duration-1000 ease-in-out ${overlayOpacityClass}`}></div>
       
       {/* Main Glass/Premium Card Container */}
-      <div className="bg-white/80 backdrop-blur-3xl rounded-[2vw] shadow-[0_1vw_3vw_rgba(0,0,0,0.06)] border border-white/60 p-[2.5vw] flex flex-col justify-between relative w-[95vw] h-[92vh]">
+      <div className="bg-[#ffffffcc] backdrop-blur-3xl rounded-[2vw] shadow-[0_1vw_3vw_rgba(0,0,0,0.06)] border border-[#ffffff99] p-[2.5vw] flex flex-col justify-between relative w-[95vw] h-[92vh]">
         
         <input 
           ref={inputRef}
@@ -483,7 +483,7 @@ function App() {
               </div>
             </div>
             
-            <div className="w-full bg-gradient-to-b from-[#22a44d] to-[#067734] rounded-[1.2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-green-500/20 transform transition-transform duration-300 hover:scale-[1.02]">
+            <div className="w-full bg-gradient-to-b from-[#22a44d] to-[#067734] rounded-[1.2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-[#22c55e33] transform transition-transform duration-300 hover:scale-[1.02]">
               <div className="text-[7.5vw] font-bold text-white tracking-[0.05em] leading-none font-mono drop-shadow-sm">
                 {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
@@ -494,7 +494,7 @@ function App() {
           </div>
 
           {/* Right Panel - NFC Interaction Area */}
-          <div className="flex-1 bg-slate-50/50 rounded-[2vw] border border-slate-100 flex flex-col justify-center items-center relative overflow-hidden shadow-inner">
+          <div className="flex-1 bg-[#f8fafc80] rounded-[2vw] border border-[#f1f5f9] flex flex-col justify-center items-center relative overflow-hidden shadow-inner">
             
             {/* Standby State */}
             <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-700 ease-in-out ${viewState === 'standby' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
@@ -517,8 +517,8 @@ function App() {
             </div>
             
             {/* Result State */}
-            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out bg-white/40 backdrop-blur-md ${viewState === 'result' ? 'opacity-100 scale-100' : 'opacity-0 scale-110 pointer-events-none'}`}>
-              <div className={`w-[14vw] h-[14vw] rounded-full border-[0.5vw] overflow-hidden mb-[1.5vw] shadow-xl bg-white ${resultData?.warna.includes('text-red') ? 'border-red-500 shadow-red-500/20' : (resultData?.warna.includes('text-amber') ? 'border-amber-500 shadow-amber-500/20' : 'border-emerald-600 shadow-emerald-600/20')}`}>
+            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out bg-[#ffffff66] backdrop-blur-md ${viewState === 'result' ? 'opacity-100 scale-100' : 'opacity-0 scale-110 pointer-events-none'}`}>
+              <div className={`w-[14vw] h-[14vw] rounded-full border-[0.5vw] overflow-hidden mb-[1.5vw] shadow-xl bg-white ${resultData?.warna.includes('text-red') ? 'border-[#ef4444]' : (resultData?.warna.includes('text-amber') ? 'border-[#f59e0b]' : 'border-[#059669]')}`}>
                 <img src={resultData?.foto} className="w-full h-full object-cover" alt="Avatar" onError={(e) => e.target.src=AVATAR_NETRAL} />
               </div>
               
@@ -526,7 +526,7 @@ function App() {
                 {resultData?.nama}
               </h2>
               
-              <p className="text-[1.5vw] font-bold text-slate-500 text-center mt-[0.5vw] px-[1.5vw] py-[0.2vw] rounded-full bg-slate-100/80">
+              <p className="text-[1.5vw] font-bold text-slate-500 text-center mt-[0.5vw] px-[1.5vw] py-[0.2vw] rounded-full bg-[#f1f5f9cc]">
                 {resultData?.detail}
               </p>
               
