@@ -358,12 +358,12 @@ function App() {
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center p-2 relative overflow-hidden bg-gradient-to-br from-[#e8f5e9] to-[#c8e6c9]">
+    <div className="w-screen h-screen flex items-center justify-center relative overflow-hidden bg-[#eaf4eb]">
       
       {/* Layar Redup & Blackout Overlay */}
       <div className={`absolute inset-0 bg-black pointer-events-none z-50 transition-opacity duration-1000 ease-in-out ${overlayOpacityClass}`}></div>
       
-      <div className="dashboard-canvas bg-white/80 backdrop-blur-xl border border-white/40 rounded-[2vw] shadow-2xl p-[3vw] flex flex-col justify-between relative w-[96vw] h-[92vh]">
+      <div className="bg-white rounded-[1.5vw] flex flex-col justify-between relative w-[95vw] h-[92vh] p-[2.5vw] shadow-[0_0_15px_rgba(0,0,0,0.05)]">
         
         <input 
           ref={inputRef}
@@ -377,71 +377,71 @@ function App() {
           autoComplete="off" 
         />
 
-        <div className="w-full flex flex-row items-center justify-between flex-grow min-h-0 gap-[3vw]">
+        <div className="w-full flex flex-row items-stretch flex-grow gap-[4vw]">
           
           {/* Left Panel */}
-          <div className="w-[50%] h-full flex flex-col justify-center items-center text-center">
-            <div className="flex flex-col items-center justify-center mb-[2vw] w-full text-center">
-              <h1 className="text-[3.8vw] font-black text-slate-800 tracking-tight leading-none mb-[1vw] uppercase drop-shadow-sm">
-                Layar Absensi
+          <div className="w-1/2 flex flex-col justify-center">
+            <div className="flex flex-col items-center mb-[1.5vw]">
+              <h1 className="text-[3.2vw] font-black text-[#1e293b] uppercase tracking-wide leading-none">
+                LAYAR ABSENSI
               </h1>
-              <div className="flex items-center justify-center gap-[1.2vw] mt-[0.5vw]">
-                <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-[4.5vw] h-[4.5vw] object-contain drop-shadow-md" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
-                <span className="text-[3.2vw] font-extrabold text-green-600 tracking-wide leading-none">Madrasah Inovatif</span>
+              <div className="flex items-center gap-[0.8vw] mt-[0.8vw]">
+                <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-[3.5vw] h-[3.5vw] object-contain" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
+                <span className="text-[2.6vw] font-bold text-[#15803d] tracking-normal leading-none">Madrasah Inovatif</span>
               </div>
             </div>
             
-            <div className="w-full bg-gradient-to-br from-green-600 to-emerald-700 rounded-[1.5vw] py-[2.5vw] px-[3vw] text-white shadow-[0_1vw_2vw_rgba(5,150,105,0.3)] border border-green-500/50 flex flex-col justify-center items-center transform transition-all hover:scale-[1.02]">
-              <div className="text-[7vw] font-black tracking-widest tabular-nums leading-none drop-shadow-md">
-                {time.toLocaleTimeString('id-ID', { hour12: false })}
+            <div className="w-full bg-[#108146] rounded-[1vw] py-[2.5vw] px-[3vw] flex flex-col justify-center items-center shadow-md">
+              <div className="text-[7.5vw] font-bold text-white tracking-[0.15em] leading-none font-mono">
+                {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
-              <div className="text-[2vw] font-semibold text-green-100 mt-[1vw] uppercase tracking-wider">
+              <div className="text-[1.6vw] font-medium text-white mt-[1vw] uppercase tracking-wider">
                 {time.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             </div>
           </div>
 
           {/* Right Panel */}
-          <div className="w-[45%] h-full bg-slate-50/70 backdrop-blur-sm rounded-[2vw] p-[2.5vw] flex flex-col justify-center items-center shadow-inner border border-slate-200/50 relative overflow-hidden">
+          <div className="w-1/2 bg-[#f8faf9] rounded-[1.2vw] flex flex-col justify-center items-center relative overflow-hidden">
             
-            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out ${viewState === 'standby' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
-              <div className="relative w-[16vw] h-[16vw] bg-white rounded-full flex items-center justify-center border-2 border-green-100 shadow-[0_0.5vw_1vw_rgba(0,0,0,0.05)] mb-[2vw]">
-                <div className="text-[6vw]">💳</div>
-                <div className="absolute inset-0 rounded-full border-[0.3vw] border-green-500/20 animate-ping pointer-events-none"></div>
+            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-opacity duration-300 ${viewState === 'standby' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="relative w-[16vw] h-[16vw] rounded-full bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-center mb-[2.5vw]">
+                 {/* Outer rings */}
+                <div className="absolute inset-[-3.5vw] rounded-full border border-[#f0f4f0] -z-10"></div>
+                <div className="absolute inset-[-7vw] rounded-full border border-[#f0f4f0] -z-10"></div>
+                
+                {/* The card icon (You can replace this emoji with an SVG if needed, but styling closely matches) */}
+                <div className="text-[6.5vw] text-[#0ea5e9]">💳</div>
               </div>
-              <p className="text-[2vw] font-bold text-slate-600 mb-[2vw] text-center leading-snug">
+              <p className="text-[1.8vw] font-bold text-[#475569] text-center leading-snug">
                 Silakan Tempelkan<br/>Kartu Anda...
               </p>
             </div>
             
-            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out ${viewState === 'result' ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'}`}>
-              <div className="relative w-[16vw] h-[16vw] rounded-full border-[0.4vw] border-green-500 overflow-hidden mb-[1vw] bg-white shadow-[0_1vw_2vw_rgba(0,0,0,0.15)] ring-4 ring-green-100 transition-all">
+            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-opacity duration-300 ${viewState === 'result' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="w-[14vw] h-[14vw] rounded-full border-[0.4vw] border-[#15803d] overflow-hidden mb-[1.5vw] bg-white shadow-md">
                 <img src={resultData?.foto} className="w-full h-full object-cover" alt="Avatar" onError={(e) => e.target.src=AVATAR_NETRAL} />
               </div>
               
-              <h2 className="text-[2.5vw] font-extrabold text-slate-800 text-center leading-tight tracking-tight mt-[0.5vw] px-[1vw]">
+              <h2 className="text-[2.2vw] font-extrabold text-[#1e293b] text-center leading-tight px-[1vw]">
                 {resultData?.nama}
               </h2>
               
-              <p className="text-[1.5vw] font-semibold text-slate-500 text-center mt-[0.2vw] bg-slate-100 px-[1.5vw] py-[0.2vw] rounded-full">
+              <p className="text-[1.4vw] font-semibold text-[#64748b] text-center mt-[0.3vw]">
                 {resultData?.detail}
               </p>
               
-              <p className={`text-[1.8vw] font-black text-center mt-[1vw] drop-shadow-sm ${resultData?.warna.includes('bg-red') ? 'text-red-500' : (resultData?.warna.includes('bg-amber') ? 'text-amber-500' : 'text-green-600')}`}>
+              <p className={`text-[1.8vw] font-black text-center mt-[1vw] ${resultData?.warna.includes('bg-red') ? 'text-red-600' : (resultData?.warna.includes('bg-amber') ? 'text-amber-600' : 'text-[#15803d]')}`}>
                 {resultData?.pesan}
               </p>
-              
-              <span className={`mt-[1vw] px-[3vw] py-[0.5vw] text-[1.4vw] font-bold rounded-full uppercase shadow-md tracking-wider ${resultData?.warna}`}>
-                {resultData?.status}
-              </span>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="text-[1.4vw] font-semibold text-slate-400 pt-[1.5vw] border-t border-slate-200/60 w-full flex justify-between items-center">
-          <span>Sistem Absensi Digital v6.0 (Tabel Terpisah)</span>
-          <span className={`font-bold px-[1vw] py-[0.2vw] rounded-full transition-colors ${queueCount > 0 ? 'text-amber-600 bg-amber-50 animate-pulse' : 'text-green-600 bg-green-50'}`}>
+        <div className="text-[1.1vw] font-semibold text-[#94a3b8] w-full flex justify-between items-end mt-[2vw]">
+          <span>Sistem Absensi Digital v4.4</span>
+          <span className={`font-bold transition-colors ${queueCount > 0 ? 'text-amber-500' : 'text-[#15803d]'}`}>
             {syncStatus}
           </span>
         </div>
