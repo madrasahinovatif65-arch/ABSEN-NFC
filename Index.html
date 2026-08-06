@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Layar Absensi Madrasah Inovatif</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    html, body { height: 100vh; width: 100vw; overflow: hidden; margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); }
+    .dashboard-canvas { aspect-ratio: 16 / 9; width: 96vw; max-height: 92vh; }
+    .text-clock { font-size: 7vw; }
+    .text-footer { font-size: 1.4vw; }
+    #dimmer-overlay { transition: opacity 1s ease-in-out; }
+    #nfc-input { position: absolute; left: -9999px; opacity: 0; }
+  </style>
+</head>
+<body class="w-full h-full flex items-center justify-center p-2 relative">
+  <div id="dimmer-overlay" class="absolute inset-0 bg-black opacity-0 pointer-events-none z-50"></div>
+  
+  <div class="dashboard-canvas bg-white/80 backdrop-blur-md rounded-[2vw] shadow-2xl p-[3vw] flex flex-col justify-between overflow-hidden relative">
+    
+    <input id="nfc-input" type="text" autofocus onkeypress="checkEnter(event)" autocomplete="off" />
+
+    <div class="w-full flex flex-row items-center justify-between flex-grow min-h-0 gap-[3vw]">
+      
+      <div class="w-[50%] h-full flex flex-col justify-center items-center text-center">
+        <div class="flex flex-col items-center justify-center mb-[2vw] w-full text-center">
+          <h1 class="text-[3.8vw] font-black text-slate-800 tracking-tight leading-none mb-[1vw] uppercase">Layar Absensi</h1>
+          <div class="flex items-center justify-center gap-[1.2vw] mt-[0.5vw]">
+            <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" class="w-[4.5vw] h-[4.5vw] object-contain" onerror="this.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'" />
+            <span class="text-[3.2vw] font-extrabold text-green-600 tracking-wide leading-none">Madrasah Inovatif</span>
+          </div>
+        </div>
+        <div class="w-full bg-gradient-to-br from-green-600 to-emerald-700 rounded-[1.5vw] py-[2.5vw] px-[3vw] text-white shadow-lg flex flex-col justify-center items-center">
+          <div id="clock" class="text-clock font-black tracking-widest tabular-nums leading-none">00:00:00</div>
+          <div id="date" class="text-[2vw] font-semibold text-green-100 mt-[1vw] uppercase">Memuat Tanggal...</div>
+        </div>
+      </div>
+
+      <div class="w-[45%] h-full bg-slate-50/50 rounded-[2vw] p-[2.5vw] flex flex-col justify-center items-center shadow-inner relative">
+        
+        <div id="view-standby" class="flex flex-col justify-center items-center w-full h-full">
+          <div class="relative w-[16vw] h-[16vw] bg-white rounded-full flex items-center justify-center border-2 border-green-100 shadow-md mb-[2vw]">
+            <div class="text-[6vw]">💳</div>
+            <div class="absolute inset-0 rounded-full border-4 border-green-500/20 animate-ping pointer-events-none"></div>
+          </div>
+          <p class="text-[2vw] font-bold text-slate-600 mb-[2vw] text-center">Silakan Tempelkan<br>Kartu Anda...</p>
+        </div>
+        
+        <div id="view-result" class="hidden flex flex-col justify-center items-center w-full h-full">
+          <div class="relative w-[16vw] h-[16vw] rounded-full border-[0.4vw] border-green-500 overflow-hidden mb-[1vw] bg-white shadow-lg">
+            <img id="res-foto" src="" class="w-full h-full object-cover">
+          </div>
+          
+          <h2 id="res-nama" class="text-[2.5vw] font-extrabold text-slate-800 text-center leading-tight">Nama Pengguna</h2>
+          
+          <p id="res-kelas" class="text-[1.5vw] font-semibold text-slate-500 text-center mt-[0.2vw]">Detail: -</p>
+          
+          <p id="res-pesan" class="text-[1.8vw] font-bold text-green-600 text-center mt-[0.5vw]">Pesan</p>
+          
+          <span id="res-badge" class="mt-[1vw] px-[2.5vw] py-[0.4vw] text-[1.2vw] font-bold text-white rounded-full uppercase shadow-sm">HADIR</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-footer font-semibold text-slate-400 pt-[1.5vw] border-t border-slate-100 w-full flex justify-between">
+      <span>Sistem Absensi Digital v4.4</span>
+      <span id="sync-status" class="text-green-600 font-bold cursor-pointer hover:underline" onclick="paksaSinkronManual()">Memuat...</span>
+    </div>
+  </div>
+
+  <script>
+    const DEBUG_MODE = false; 
+    
+    let db, standbyTimer, idleTimer, cacheMurid = null, historyLokal = {};
+    const inputElement = document.getElementById('nfc-input');
+    
+    let uidTerakhir = "";
+    let waktuScanTerakhir = 0;
+    const AVATAR_NETRAL = "https://cdn-icons-png.flaticon.com/512/847/847969.png"; 
+
+    let counterDatangLokal = 0;
+    let counterPulangLokal = 0;
+    let tanggalCounterLokal = new Date().toDateString();
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
+      document.getElementById('date').textContent = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    document.addEventListener('click', () => { inputElement.focus(); resetIdleTimer(); });
+    inputElement.addEventListener('blur', () => { setTimeout(() => inputElement.focus(), 10); });
+    document.addEventListener('keydown', (e) => {
+      resetIdleTimer();
+      if (document.activeElement !== inputElement) inputElement.focus();
+    });
+
+    async function aktifkanWakeLock() {
+      try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+      catch (err) { console.warn(err); }
+    }
+    aktifkanWakeLock();
+    document.addEventListener('visibilitychange', () => { if (wakeLock !== null && document.visibilityState === 'visible') aktifkanWakeLock(); });
+
+    function resetIdleTimer() {
+      document.getElementById('dimmer-overlay').style.opacity = "0";
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => { document.getElementById('dimmer-overlay').style.opacity = "0.65"; }, 30000); 
+    }
+    document.onmousemove = resetIdleTimer;
+
+    // Versi Database dinaikkan ke 3 untuk mereset cache lokal
+    const dbRequest = indexedDB.open("DatabaseAbsensiMI", 3);
+    dbRequest.onupgradeneeded = e => { 
+      db = e.target.result; 
+      if (!db.objectStoreNames.contains("antrean")) {
+        db.createObjectStore("antrean", { keyPath: "id", autoIncrement: true }); 
+      }
+      if (!db.objectStoreNames.contains("fotomurid")) {
+        db.createObjectStore("fotomurid", { keyPath: "uid" }); 
+      }
+    };
+    dbRequest.onsuccess = e => { 
+      db = e.target.result; 
+      perbaruiIndikatorStatus(); 
+    };
+
+    window.onload = function() {
+      inputElement.focus();
+      if (typeof google !== 'undefined') {
+        document.getElementById('sync-status').textContent = "Mengunduh Database & Cache Foto...";
+        document.getElementById('sync-status').className = "text-blue-500 font-bold animate-pulse";
+        google.script.run.withSuccessHandler(data => { 
+          cacheMurid = data; 
+          perbaruiIndikatorStatus(); 
+          unduhDanSimpanFotoLokal(data); 
+        }).downloadDatabaseMurid(); // Memanggil fungsi baru
+      }
+    };
+
+    async function unduhDanSimpanFotoLokal(dataMurid) {
+      if (!db) return;
+      for (let uid in dataMurid) {
+        let urlFoto = dataMurid[uid].foto;
+        if (urlFoto && urlFoto !== "") {
+          try {
+            const txCheck = db.transaction(["fotomurid"], "readonly");
+            const storeCheck = txCheck.objectStore("fotomurid");
+            const existing = await new Promise(resolve => {
+              const req = storeCheck.get(uid);
+              req.onsuccess = () => resolve(req.result);
+              req.onerror = () => resolve(null);
+            });
+
+            if (!existing) {
+              const response = await fetch(urlFoto);
+              const blob = await response.blob();
+              const txWrite = db.transaction(["fotomurid"], "readwrite");
+              txWrite.objectStore("fotomurid").put({ uid: uid, blob: blob });
+            }
+          } catch (err) {
+            console.warn("Gagal cache foto:", uid);
+          }
+        }
+      }
+      document.getElementById('sync-status').textContent = `✓ Sistem Siap (${Object.keys(dataMurid).length} Data)`;
+    }
+
+    function checkEnter(e) { 
+      if (e.key === 'Enter') { 
+        const val = inputElement.value.trim();
+        const sekarang = Date.now();
+        
+        if (val !== "") {
+          if (val === uidTerakhir && (sekarang - waktuScanTerakhir) < 4000) {
+            inputElement.value = ""; 
+            return; 
+          }
+          uidTerakhir = val;
+          waktuScanTerakhir = sekarang;
+          simpanKeAntreanLokal(val); 
+        } 
+        inputElement.value = ""; 
+      } 
+    }
+
+    function simpanKeAntreanLokal(uid) {
+      const uidLower = uid.toLowerCase();
+      if (cacheMurid && cacheMurid[uidLower]) {
+        tampilkanResponsInstanDariCache(cacheMurid[uidLower], uidLower);
+      } else {
+        tampilkanResponsVisualInstan(uid);
+      }
+
+      if (!db) return;
+      const store = db.transaction(["antrean"], "readwrite").objectStore("antrean");
+      store.add({ uid: uid, waktu: new Date().toISOString(), dariCache: !!(cacheMurid && cacheMurid[uidLower]) }).onsuccess = () => {
+        perbaruiIndikatorStatus();
+        kirimAntreanKeGoogleSheet(); 
+      };
+    }
+
+    async function tampilkanResponsInstanDariCache(pengguna, uid) {
+      document.getElementById('view-standby').classList.add('hidden');
+      document.getElementById('view-result').classList.remove('hidden');
+      document.getElementById('res-nama').textContent = pengguna.nama;
+      
+      const hariIni = new Date().toDateString();
+      if (tanggalCounterLokal !== hariIni) {
+        counterDatangLokal = 0;
+        counterPulangLokal = 0;
+        tanggalCounterLokal = hariIni;
+        historyLokal = {}; 
+      }
+      
+      const now = new Date(); 
+      const jam = now.getHours() + (now.getMinutes()/60);
+      const hariID = now.getDay(); 
+      
+      let status="", warna="", pesan="", nomorUrutTampil = "";
+      const isGuru = pengguna.role === "guru";
+      
+      if (isGuru && hariID === 0) {
+        status = "DITOLAK"; warna = "bg-red-500"; pesan = "Hari Minggu Libur!";
+      } else {
+        let batasPulang = 9; 
+        if (isGuru) {
+          batasPulang = (hariID === 5) ? 10.5 : 12.0; 
+        }
+
+        if (jam <= 7) { 
+          if (historyLokal[uid + "_datang"]) { 
+            status="DITOLAK"; warna="bg-red-500"; pesan="Kamu sudah absen DATANG!"; 
+          } else { 
+            counterDatangLokal++;
+            status="DATANG"; warna="bg-green-600"; pesan="Berhasil Absen Datang"; 
+            nomorUrutTampil = `Urutan ke-${counterDatangLokal}`;
+            historyLokal[uid+"_datang"]=true; 
+          }
+        } else if (jam > 7 && jam < batasPulang) { 
+          status="TERKUNCI"; warna="bg-red-500"; pesan="Terlambat! Izin Pimpinan / Wali."; 
+        } else { 
+          if (historyLokal[uid + "_pulang"]) { 
+            status="DITOLAK"; warna="bg-red-500"; pesan="Kamu sudah absen PULANG!"; 
+          } else { 
+            counterPulangLokal++;
+            status="PULANG"; warna="bg-green-600"; pesan="Berhasil Absen Pulang"; 
+            nomorUrutTampil = `Urutan ke-${counterPulangLokal}`;
+            historyLokal[uid+"_pulang"]=true; 
+          }
+        }
+      }
+
+      const labelDetail = isGuru ? "Jabatan: " : "Kelas: ";
+      document.getElementById('res-kelas').textContent = labelDetail + pengguna.kelas + (nomorUrutTampil ? ` (${nomorUrutTampil})` : "");
+      
+      const elemenFoto = document.getElementById('res-foto');
+      elemenFoto.src = AVATAR_NETRAL; 
+
+      if (db) {
+        const tx = db.transaction(["fotomurid"], "readonly");
+        const store = tx.objectStore("fotomurid");
+        const req = store.get(uid);
+        req.onsuccess = function() {
+          if (req.result && req.result.blob) {
+            elemenFoto.src = URL.createObjectURL(req.result.blob);
+          } else if (pengguna.foto) {
+            elemenFoto.src = pengguna.foto; 
+          }
+        };
+      }
+      
+      const pesanEl = document.getElementById('res-pesan');
+      pesanEl.textContent = pesan;
+      pesanEl.className = `text-[1.8vw] font-bold text-center mt-[0.5vw] ${warna === 'bg-red-500' ? 'text-red-500' : 'text-green-600'}`;
+      
+      const badge = document.getElementById('res-badge');
+      badge.textContent = status; 
+      badge.className = `mt-[1vw] px-[2.5vw] py-[0.4vw] text-[1.2vw] font-bold text-white rounded-full uppercase shadow-sm ${warna}`;
+      
+      clearTimeout(standbyTimer);
+      standbyTimer = setTimeout(() => { 
+        document.getElementById('view-result').classList.add('hidden'); 
+        document.getElementById('view-standby').classList.remove('hidden'); 
+      }, 3000);
+    }
+
+    function tampilkanResponsVisualInstan(uid) {
+      document.getElementById('view-standby').classList.add('hidden');
+      document.getElementById('view-result').classList.remove('hidden');
+      document.getElementById('res-foto').src = AVATAR_NETRAL;
+      document.getElementById('res-nama').textContent = "Mencari Data...";
+      document.getElementById('res-kelas').textContent = "";
+      document.getElementById('res-pesan').textContent = "UID: " + uid;
+      document.getElementById('res-pesan').className = "text-[1.8vw] font-bold text-slate-500 text-center mt-[0.5vw]";
+      
+      const badge = document.getElementById('res-badge');
+      badge.textContent = "TERBACA";
+      badge.className = "mt-[1vw] px-[2.5vw] py-[0.4vw] text-[1.2vw] font-bold text-slate-800 rounded-full bg-amber-400 uppercase shadow-sm animate-pulse";
+    }
+
+    let sedangProsesKirim = false;
+    
+    function kirimAntreanKeGoogleSheet() {
+      if (!db || sedangProsesKirim) return;
+      const tx = db.transaction(["antrean"], "readwrite");
+      const store = tx.objectStore("antrean");
+      
+      store.openCursor().onsuccess = e => {
+        const cursor = e.target.result;
+        if (cursor) {
+          sedangProsesKirim = true;
+          
+          if(typeof google !== 'undefined') {
+            google.script.run
+              .withSuccessHandler((res) => {
+                if (res && res.status === "failed" && res.nama === "Sistem Sibuk") {
+                  sedangProsesKirim = false; 
+                  return; 
+                }
+
+                const delTx = db.transaction(["antrean"], "readwrite");
+                delTx.objectStore("antrean").delete(cursor.key).onsuccess = () => {
+                  sedangProsesKirim = false;
+                  perbaruiIndikatorStatus();
+                  kirimAntreanKeGoogleSheet(); 
+                };
+              })
+              .withFailureHandler((err) => {
+                sedangProsesKirim = false;
+                perbaruiIndikatorStatus();
+              })
+              .prosesAbsenWeb(cursor.value.uid);
+          }
+        } else { 
+          sedangProsesKirim = false;
+          perbaruiIndikatorStatus(); 
+        }
+      };
+    }
+
+    function paksaSinkronManual() { 
+      sedangProsesKirim = false; 
+      kirimAntreanKeGoogleSheet(); 
+    }
+    
+    function perbaruiIndikatorStatus() {
+      if(!db) return;
+      const tx = db.transaction(["antrean"], "readonly");
+      tx.objectStore("antrean").count().onsuccess = e => {
+        const count = e.target.result;
+        const statusEl = document.getElementById('sync-status');
+        if (count > 0) {
+          statusEl.textContent = `⏳ Antrean: ${count}`;
+          statusEl.className = "text-amber-500 font-bold cursor-pointer hover:underline animate-pulse";
+        } else if (cacheMurid) {
+          statusEl.textContent = `✓ Sistem Siap (${Object.keys(cacheMurid).length} Data)`;
+          statusEl.className = "text-green-600 font-bold cursor-pointer hover:underline";
+        }
+      };
+    }
+
+    setInterval(() => {
+      kirimAntreanKeGoogleSheet();
+    }, 15000);
+  </script>
+</body>
+</html>
