@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 const AVATAR_NETRAL = "https://cdn-icons-png.flaticon.com/512/847/847969.png";
@@ -19,6 +20,7 @@ function NfcScanner() {
   
   const inputRef = useRef(null);
   const wakeLockRef = useRef(null);
+  const navigate = useNavigate();
   
   // Local Caches & Persistence
   const loadHistory = () => {
@@ -477,7 +479,11 @@ function NfcScanner() {
               <h1 className="text-[3.5vw] font-black text-slate-800 uppercase tracking-tight leading-none mb-[1vw]">
                 Layar Absensi
               </h1>
-              <div className="flex items-center gap-[1vw]">
+              <div 
+                className="flex items-center gap-[1vw] cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => navigate('/admin')}
+                title="Masuk ke Panel Admin"
+              >
                 <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-[4.5vw] h-[4.5vw] object-contain drop-shadow-sm" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
                 <span className="text-[3vw] font-bold text-emerald-700 tracking-wide leading-none">Madrasah Inovatif</span>
               </div>
