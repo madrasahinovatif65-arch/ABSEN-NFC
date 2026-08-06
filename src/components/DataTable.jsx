@@ -6,6 +6,7 @@ function DataTable({ table, title, isLog = false }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterSelection, setFilterSelection] = useState('');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -95,10 +96,12 @@ function DataTable({ table, title, isLog = false }) {
     setSortConfig({ key, direction });
   };
 
-  const filteredData = data.filter(row => 
-    (row.nama?.toLowerCase() || '').includes(search.toLowerCase()) || 
-    (row.rfid_uid?.toLowerCase() || '').includes(search.toLowerCase())
-  ).sort((a, b) => {
+  const filteredData = data.filter(row => {
+    const matchesSearch = (row.nama?.toLowerCase() || '').includes(search.toLowerCase()) || 
+                          (row.rfid_uid?.toLowerCase() || '').includes(search.toLowerCase());
+    const matchesDropdown = filterSelection === '' || (isLog ? row.jenis_absen === filterSelection : row.detail === filterSelection);
+    return matchesSearch && matchesDropdown;
+  }).sort((a, b) => {
     if (!a[sortConfig.key]) return 1;
     if (!b[sortConfig.key]) return -1;
     
@@ -116,6 +119,8 @@ function DataTable({ table, title, isLog = false }) {
     return <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
   };
 
+  const uniqueFilters = [...new Set(data.map(row => isLog ? row.jenis_absen : row.detail))].filter(Boolean).sort();
+
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
       {/* Header */}
@@ -130,9 +135,18 @@ function DataTable({ table, title, isLog = false }) {
               placeholder="Cari nama atau UID..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none w-64 text-sm"
+              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none w-56 text-sm"
             />
           </div>
+
+          <select 
+            value={filterSelection} 
+            onChange={(e) => setFilterSelection(e.target.value)}
+            className="px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm bg-white cursor-pointer"
+          >
+            <option value="">Semua {isLog ? 'Status' : 'Kelas/Detail'}</option>
+            {uniqueFilters.map((f, i) => <option key={i} value={f}>{f}</option>)}
+          </select>
           
           {!isLog && (
             <button 
