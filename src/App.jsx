@@ -392,12 +392,16 @@ function App() {
     }
   }
 
-  // Overlay Opacity Logic (Diperbaiki)
+  // Overlay Opacity Logic (Diperbaiki untuk Maintenance)
   let overlayOpacityClass = "opacity-0";
-  if (!isActiveHour) {
-    overlayOpacityClass = "opacity-100"; // Blackout mati total
-  } else if (isIdle) {
-    overlayOpacityClass = "opacity-70"; // Redup setelah 30s
+  if (isIdle) {
+    if (!isActiveHour) {
+      overlayOpacityClass = "opacity-100"; // Blackout mati total setelah 30 detik di luar jam kerja
+    } else {
+      overlayOpacityClass = "opacity-70"; // Hanya redup setelah 30 detik saat jam kerja
+    }
+  } else {
+    overlayOpacityClass = "opacity-0"; // Terang benderang (menyala) saat disentuh/ada aktivitas
   }
 
   return (
