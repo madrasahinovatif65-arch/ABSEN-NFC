@@ -6,7 +6,8 @@ function DataTable({ table, title, isLog = false }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterSelection, setFilterSelection] = useState('');
+  const [filterKelas, setFilterKelas] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -99,8 +100,9 @@ function DataTable({ table, title, isLog = false }) {
   const filteredData = data.filter(row => {
     const matchesSearch = (row.nama?.toLowerCase() || '').includes(search.toLowerCase()) || 
                           (row.rfid_uid?.toLowerCase() || '').includes(search.toLowerCase());
-    const matchesDropdown = filterSelection === '' || (isLog ? row.jenis_absen === filterSelection : row.detail === filterSelection);
-    return matchesSearch && matchesDropdown;
+    const matchesKelas = filterKelas === '' || row.detail === filterKelas;
+    const matchesStatus = filterStatus === '' || (!isLog) || (isLog && row.jenis_absen === filterStatus);
+    return matchesSearch && matchesKelas && matchesStatus;
   }).sort((a, b) => {
     if (!a[sortConfig.key]) return 1;
     if (!b[sortConfig.key]) return -1;
@@ -119,7 +121,8 @@ function DataTable({ table, title, isLog = false }) {
     return <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
   };
 
-  const uniqueFilters = [...new Set(data.map(row => isLog ? row.jenis_absen : row.detail))].filter(Boolean).sort();
+  const uniqueKelas = [...new Set(data.map(row => row.detail))].filter(Boolean).sort();
+  const uniqueStatus = isLog ? [...new Set(data.map(row => row.jenis_absen))].filter(Boolean).sort() : [];
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
@@ -140,13 +143,24 @@ function DataTable({ table, title, isLog = false }) {
           </div>
 
           <select 
-            value={filterSelection} 
-            onChange={(e) => setFilterSelection(e.target.value)}
+            value={filterKelas} 
+            onChange={(e) => setFilterKelas(e.target.value)}
             className="px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm bg-white cursor-pointer"
           >
-            <option value="">Semua {isLog ? 'Status' : 'Kelas/Detail'}</option>
-            {uniqueFilters.map((f, i) => <option key={i} value={f}>{f}</option>)}
+            <option value="">Semua Kelas/Jabatan</option>
+            {uniqueKelas.map((f, i) => <option key={i} value={f}>{f}</option>)}
           </select>
+
+          {isLog && (
+            <select 
+              value={filterStatus} 
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none text-sm bg-white cursor-pointer"
+            >
+              <option value="">Semua Status Absen</option>
+              {uniqueStatus.map((f, i) => <option key={i} value={f}>{f}</option>)}
+            </select>
+          )}
           
           {!isLog && (
             <button 
