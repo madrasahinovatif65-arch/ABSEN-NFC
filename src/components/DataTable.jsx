@@ -12,6 +12,9 @@ function DataTable({ table, title, isLog = false }) {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ rfid_uid: '', nama: '', detail: '', foto_url: '' });
   
+  // Sort State
+  const [sortConfig, setSortConfig] = useState({ key: 'nama', direction: 'asc' });
+
   const [isScanning, setIsScanning] = useState(false);
   const scanInputRef = useRef(null);
 
@@ -84,10 +87,34 @@ function DataTable({ table, title, isLog = false }) {
     setIsModalOpen(true);
   };
 
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const filteredData = data.filter(row => 
     (row.nama?.toLowerCase() || '').includes(search.toLowerCase()) || 
     (row.rfid_uid?.toLowerCase() || '').includes(search.toLowerCase())
-  );
+  ).sort((a, b) => {
+    if (!a[sortConfig.key]) return 1;
+    if (!b[sortConfig.key]) return -1;
+    
+    if (a[sortConfig.key] < b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (a[sortConfig.key] > b[sortConfig.key]) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
+  });
+
+  const SortIcon = ({ columnKey }) => {
+    if (sortConfig.key !== columnKey) return <span className="ml-1 opacity-20">↕</span>;
+    return <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
+  };
 
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
@@ -128,10 +155,16 @@ function DataTable({ table, title, isLog = false }) {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 sticky top-0 z-10">
               <tr>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">UID Kartu</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">Nama</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">{isLog ? 'Keterangan / Absen' : 'Detail / Kelas'}</th>
-                {isLog && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">Waktu</th>}
+                <th onClick={() => handleSort('rfid_uid')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                  UID Kartu <SortIcon columnKey="rfid_uid" />
+                </th>
+                <th onClick={() => handleSort('nama')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                  Nama <SortIcon columnKey="nama" />
+                </th>
+                <th onClick={() => handleSort(isLog ? 'jenis_absen' : 'detail')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
+                  {isLog ? 'Keterangan / Absen' : 'Detail / Kelas'} <SortIcon columnKey={isLog ? 'jenis_absen' : 'detail'} />
+                </th>
+                {isLog && <th onClick={() => handleSort('waktu')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">Waktu <SortIcon columnKey="waktu" /></th>}
                 {!isLog && <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right">Aksi</th>}
               </tr>
             </thead>
@@ -191,21 +224,19 @@ function DataTable({ table, title, isLog = false }) {
                   <input 
                     type="text" 
                     required
-                    disabled={!!editingId || isScanning}
+                    disabled={isScanning}
                     value={isScanning ? "Menunggu Tap Kartu..." : formData.rfid_uid}
                     onChange={(e) => setFormData({...formData, rfid_uid: e.target.value})}
-                    className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none font-mono text-sm bg-slate-50 disabled:bg-slate-100"
+                    className="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 outline-none font-mono text-sm bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500"
                     placeholder="Contoh: a1b2c3d4"
                   />
-                  {!editingId && (
-                    <button 
-                      type="button"
-                      onClick={() => setIsScanning(!isScanning)}
-                      className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors ${isScanning ? 'bg-amber-500 text-white animate-pulse' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
-                    >
-                      <ScanLine size={18} /> {isScanning ? 'Batal' : 'Scan'}
-                    </button>
-                  )}
+                  <button 
+                    type="button"
+                    onClick={() => setIsScanning(!isScanning)}
+                    className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors ${isScanning ? 'bg-amber-500 text-white animate-pulse' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                  >
+                    <ScanLine size={18} /> {isScanning ? 'Batal' : 'Scan'}
+                  </button>
                 </div>
               </div>
 
