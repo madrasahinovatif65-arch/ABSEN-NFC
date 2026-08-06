@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Plus, Trash2, Edit2, Search, X, Loader2, ScanLine } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, X, Loader2, ScanLine, Upload, Download, CheckSquare } from 'lucide-react';
+import Papa from 'papaparse';
 
 function DataTable({ table, masterTable, title, isLog = false }) {
   const [data, setData] = useState([]);
@@ -15,6 +16,12 @@ function DataTable({ table, masterTable, title, isLog = false }) {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ rfid_uid: '', nama: '', detail: '', foto_url: '' });
   
+  // Bulk Actions & CSV State
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
   // Sort State
   const [sortConfig, setSortConfig] = useState({ key: 'nama', direction: 'asc' });
 
@@ -33,16 +40,15 @@ function DataTable({ table, masterTable, title, isLog = false }) {
 
   const fetchData = async () => {
     setLoading(true);
+    setSelectedIds([]);
     
     if (isLog && masterTable) {
       let masterData = [];
       let logData = [];
       
-      // Fetch Master Data
       const { data: mData } = await supabase.from(masterTable).select('*');
       if (mData) masterData = mData;
 
-      // Fetch Logs for selected Date
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(selectedDate);
@@ -57,7 +63,6 @@ function DataTable({ table, masterTable, title, isLog = false }) {
         if (lData) logData = [...logData, ...lData];
       }
 
-      // Group logs by uid
       const groupedLogs = {};
       logData.forEach(log => {
         const uid = log.rfid_uid;
@@ -73,7 +78,6 @@ function DataTable({ table, masterTable, title, isLog = false }) {
         }
       });
 
-      // Merge with master
       const combined = masterData.map(person => {
         const uid = person.rfid_uid;
         return {
@@ -85,7 +89,6 @@ function DataTable({ table, masterTable, title, isLog = false }) {
       
       setData(combined);
     } else {
-      // Regular Master Data Fetching
       const targetTable = Array.isArray(table) ? table[0] : table;
       const { data: result } = await supabase.from(targetTable).select('*').order('nama', { ascending: true });
       if (result) setData(result);
@@ -127,6 +130,75 @@ function DataTable({ table, masterTable, title, isLog = false }) {
       await supabase.from(targetTable).delete().eq('rfid_uid', id);
       fetchData();
     }
+  };
+
+  // Bulk Delete
+  const handleBulkDelete = async () => {
+    if (window.confirm(`Yakin ingin menghapus ${selectedIds.length} data terpilih secara permanen?`)) {
+      setLoading(true);
+      const targetTable = Array.isArray(table) ? table[0] : table;
+      const { error } = await supabase.from(targetTable).delete().in('rfid_uid', selectedIds);
+      if (error) {
+        alert("Gagal menghapus data: " + error.message);
+        setLoading(false);
+      } else {
+        fetchData();
+      }
+    }
+  };
+
+  // CSV Template
+  const handleDownloadTemplate = () => {
+    const csvContent = "rfid_uid,nama,detail,foto_url\n0000000000,Siswa Contoh,XII IPA 1,https://linkfoto.com/foto.jpg\n";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `template_upload_data.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // CSV Upload
+  const handleFileUpload = () => {
+    if (!uploadFile) return;
+    setUploading(true);
+    Papa.parse(uploadFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async function(results) {
+        const parsedData = results.data
+          .map(row => ({
+            rfid_uid: row.rfid_uid?.trim(),
+            nama: row.nama?.trim(),
+            detail: row.detail?.trim() || '',
+            foto_url: row.foto_url?.trim() || ''
+          }))
+          .filter(row => row.rfid_uid && row.nama); // minimal ada UID dan nama
+
+        if (parsedData.length > 0) {
+          const targetTable = Array.isArray(table) ? table[0] : table;
+          // Upsert dengan rfid_uid sebagai penentu conflict
+          const { error } = await supabase.from(targetTable).upsert(parsedData, { onConflict: 'rfid_uid' });
+          if (error) {
+            alert("Terjadi kesalahan saat upload: " + error.message);
+          } else {
+            alert(`Berhasil memproses (tambah/update) ${parsedData.length} baris data!`);
+            setIsUploadModalOpen(false);
+            setUploadFile(null);
+            fetchData();
+          }
+        } else {
+          alert("File CSV kosong atau format tidak sesuai.");
+        }
+        setUploading(false);
+      },
+      error: function(err) {
+        alert("Gagal membaca file: " + err.message);
+        setUploading(false);
+      }
+    });
   };
 
   const openEdit = (row) => {
@@ -189,6 +261,22 @@ function DataTable({ table, masterTable, title, isLog = false }) {
     return 0;
   });
 
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(filteredData.map(row => row.rfid_uid));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectRow = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(item => item !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
   const SortIcon = ({ columnKey }) => {
     if (sortConfig.key !== columnKey) return <span className="ml-1 opacity-20">↕</span>;
     return <span className="ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>;
@@ -247,12 +335,30 @@ function DataTable({ table, masterTable, title, isLog = false }) {
           )}
           
           {!isLog && (
-            <button 
-              onClick={openAdd}
-              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors w-full md:w-auto"
-            >
-              <Plus size={18} /> Tambah Data
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {selectedIds.length > 0 && (
+                <button 
+                  onClick={handleBulkDelete}
+                  className="flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors w-full md:w-auto shadow-sm"
+                >
+                  <Trash2 size={16} /> Hapus {selectedIds.length} Terpilih
+                </button>
+              )}
+              
+              <button 
+                onClick={() => setIsUploadModalOpen(true)}
+                className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors w-full md:w-auto shadow-sm"
+              >
+                <Upload size={16} /> Upload CSV
+              </button>
+
+              <button 
+                onClick={openAdd}
+                className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors w-full md:w-auto shadow-sm"
+              >
+                <Plus size={18} /> Tambah Data
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -265,8 +371,18 @@ function DataTable({ table, masterTable, title, isLog = false }) {
           </div>
         ) : (
           <table className="w-full text-left border-collapse min-w-[800px]">
-            <thead className="bg-slate-50 sticky top-0 z-10">
+            <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
               <tr>
+                {!isLog && (
+                  <th className="px-6 py-4 w-12 border-b border-slate-200">
+                    <input 
+                      type="checkbox"
+                      checked={filteredData.length > 0 && selectedIds.length === filteredData.length}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th onClick={() => handleSort('rfid_uid')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">
                   UID Kartu <SortIcon columnKey="rfid_uid" />
                 </th>
@@ -288,7 +404,17 @@ function DataTable({ table, masterTable, title, isLog = false }) {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.length > 0 ? filteredData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${selectedIds.includes(row.rfid_uid) ? 'bg-emerald-50/50' : ''}`}>
+                  {!isLog && (
+                    <td className="px-6 py-4">
+                      <input 
+                        type="checkbox"
+                        checked={selectedIds.includes(row.rfid_uid)}
+                        onChange={() => handleSelectRow(row.rfid_uid)}
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className="px-6 py-4 font-mono text-xs text-slate-500">{row.rfid_uid}</td>
                   <td className="px-6 py-4 font-semibold text-slate-800">{row.nama}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{row.detail}</td>
@@ -322,14 +448,65 @@ function DataTable({ table, masterTable, title, isLog = false }) {
                   )}
                 </tr>
               )) : (
-                <tr><td colSpan={isLog ? 5 : 4} className="text-center py-10 text-slate-500">Tidak ada data ditemukan.</td></tr>
+                <tr><td colSpan={isLog ? 5 : 5} className="text-center py-10 text-slate-500">Tidak ada data ditemukan.</td></tr>
               )}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Modal CRUD */}
+      {/* Modal Upload CSV */}
+      {isUploadModalOpen && (
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden relative">
+            <div className="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Upload size={20}/> Upload Data CSV</h3>
+              <button onClick={() => setIsUploadModalOpen(false)} className="text-slate-400 hover:text-red-500"><X size={20} /></button>
+            </div>
+            
+            <div className="p-6 flex flex-col gap-6">
+              
+              <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm leading-relaxed">
+                <p className="font-bold mb-1 flex items-center gap-1"><CheckSquare size={16}/> Mode Pintar (Upsert)</p>
+                Jika UID Kartu sudah ada, sistem akan <strong>memperbarui data</strong> (nama, kelas). Jika UID baru, sistem akan <strong>menambah data</strong> baru. Sangat cocok untuk proses naik kelas massal!
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase">1. Unduh Template</span>
+                <button 
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-semibold text-sm transition-colors border border-slate-300 border-dashed"
+                >
+                  <Download size={16} /> Download Template CSV
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase">2. Pilih File CSV</span>
+                <input 
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setUploadFile(e.target.files[0])}
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100 cursor-pointer"
+                />
+              </div>
+
+              <div className="mt-2 pt-4 border-t border-slate-100 flex justify-end gap-3">
+                <button onClick={() => setIsUploadModalOpen(false)} className="px-5 py-2 rounded-xl font-bold text-slate-500 hover:bg-slate-100">Batal</button>
+                <button 
+                  onClick={handleFileUpload} 
+                  disabled={!uploadFile || uploading} 
+                  className="px-5 py-2 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2 shadow-md"
+                >
+                  {uploading ? <><Loader2 size={16} className="animate-spin" /> Memproses...</> : 'Mulai Upload'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal CRUD (Tambah/Edit) */}
       {isModalOpen && !isLog && (
         <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden relative">
