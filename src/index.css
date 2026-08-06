@@ -11,7 +11,7 @@
     padding: 0; 
     box-sizing: border-box; 
     font-family: 'Plus Jakarta Sans', sans-serif; 
-    background: #eef2f6; /* Soft modern light background */
+    background: #eef2f6;
   }
 }
 
@@ -26,7 +26,7 @@
   .ripple-circle {
     position: absolute;
     border-radius: 50%;
-    border: 2px solid #22c55e; /* green-500 */
+    border: 0.2vw solid #059669; /* emerald-600 */
     opacity: 0;
     animation: ripple-anim 3s cubic-bezier(0.1, 0.7, 0.1, 1) infinite;
   }
@@ -41,34 +41,16 @@
 
   @keyframes ripple-anim {
     0% {
-      width: 100px;
-      height: 100px;
+      width: 12vw;
+      height: 12vw;
       opacity: 0.8;
-      border-width: 4px;
+      border-width: 0.3vw;
     }
     100% {
-      width: 450px;
-      height: 450px;
+      width: 35vw;
+      height: 35vw;
       opacity: 0;
-      border-width: 0px;
-    }
-  }
-
-  /* For small screens */
-  @media (max-width: 768px) {
-    @keyframes ripple-anim {
-      0% {
-        width: 80px;
-        height: 80px;
-        opacity: 0.8;
-        border-width: 4px;
-      }
-      100% {
-        width: 250px;
-        height: 250px;
-        opacity: 0;
-        border-width: 0px;
-      }
+      border-width: 0vw;
     }
   }
 }

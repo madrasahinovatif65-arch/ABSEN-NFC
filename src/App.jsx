@@ -20,9 +20,29 @@ function App() {
   const inputRef = useRef(null);
   const wakeLockRef = useRef(null);
   
-  // Local Caches
+  // Local Caches & Persistence
+  const loadHistory = () => {
+    try {
+      const savedDate = localStorage.getItem('tanggalCounterLokal');
+      const today = new Date().toDateString();
+      if (savedDate === today) {
+        const savedHistory = localStorage.getItem('historyLokal');
+        if (savedHistory) return JSON.parse(savedHistory);
+      }
+    } catch (e) {}
+    return {};
+  };
+
+  const saveHistory = (hist, dateStr) => {
+    historyLokal.current = hist;
+    try {
+      localStorage.setItem('historyLokal', JSON.stringify(hist));
+      localStorage.setItem('tanggalCounterLokal', dateStr);
+    } catch (e) {}
+  };
+
   const profilesCache = useRef({});
-  const historyLokal = useRef({});
+  const historyLokal = useRef(loadHistory());
   const syncQueue = useRef([]);
   const isSyncing = useRef(false);
   
@@ -99,7 +119,7 @@ function App() {
 
   // 4. Initial Data Fetch
   useEffect(() => {
-    const fetchProfiles = async () => {
+    const fetchProfilesAndHistory = async () => {
       try {
         const cache = {};
         
@@ -118,15 +138,36 @@ function App() {
         }
 
         profilesCache.current = cache;
+
+        // Fetch Today's History to prevent double tap if app is reloaded
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayISO = todayStart.toISOString();
+
+        const newHist = { ...historyLokal.current };
+        const tables = ['absensi_datang', 'absensi_pulang', 'absensi_guru_datang', 'absensi_guru_pulang'];
+        
+        for (const tbl of tables) {
+          const resAbsen = await supabase.from(tbl).select('rfid_uid, jenis_absen').gte('waktu', todayISO);
+          if (resAbsen.data) {
+             resAbsen.data.forEach(row => {
+                const jenis = (row.jenis_absen === "Datang") ? "datang" : "pulang";
+                newHist[`${row.rfid_uid}_${jenis}`] = true;
+             });
+          }
+        }
+        
+        saveHistory(newHist, new Date().toDateString());
+
         const total = (resMurid.data?.length || 0) + (resGuru.data?.length || 0);
         setSyncStatus(`✓ Sistem Siap (${total} Data)`);
       } catch (err) {
-        console.error("Gagal memuat profil:", err);
+        console.error("Gagal memuat profil/histori:", err);
         setSyncStatus("⚠️ Gagal memuat data. Periksa koneksi.");
       }
     };
     
-    fetchProfiles();
+    fetchProfilesAndHistory();
   }, []);
 
   // 5. Background Sync Worker
@@ -195,10 +236,11 @@ function App() {
   const processAbsen = (uid, tapTime) => {
     const uidLower = uid.toLowerCase();
     const profile = profilesCache.current[uidLower];
+    const todayStr = tapTime.toDateString();
     
-    if (tanggalCounterLokal.current !== tapTime.toDateString()) {
-      historyLokal.current = {};
-      tanggalCounterLokal.current = tapTime.toDateString();
+    if (tanggalCounterLokal.current !== todayStr) {
+      tanggalCounterLokal.current = todayStr;
+      saveHistory({}, todayStr);
     }
 
     if (!profile) {
@@ -249,7 +291,8 @@ function App() {
         foto: profile.foto_url || AVATAR_NETRAL
       });
       return;
-    } else if (jamDesimal >= 6.0 && jamDesimal <= 7.0) {
+    } 
+    else if (jamDesimal >= 6.0 && jamDesimal <= 7.0) {
       if (historyLokal.current[`${uidLower}_datang`]) {
         showResult({
           nama: profile.nama,
@@ -265,27 +308,26 @@ function App() {
       pesan = "Berhasil Absen Datang";
       status = "DATANG";
       warna = "text-emerald-600 bg-emerald-50";
-      historyLokal.current[`${uidLower}_datang`] = true;
       
-    } else if (jamDesimal > 7.0 && jamDesimal < batasPulang) {
-      if (historyLokal.current[`${uidLower}_terlambat`]) {
-        showResult({
-          nama: profile.nama,
-          detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
-          pesan: "Sudah tercatat TERLAMBAT!",
-          status: "DITOLAK",
-          warna: "text-red-500 bg-red-50",
-          foto: profile.foto_url || AVATAR_NETRAL
-        });
-        return;
-      }
-      jenisAbsen = "Terlambat";
-      pesan = "Tercatat Terlambat!";
-      status = "TERLAMBAT";
-      warna = "text-amber-600 bg-amber-50";
-      historyLokal.current[`${uidLower}_terlambat`] = true;
+      const newHist = { ...historyLokal.current };
+      newHist[`${uidLower}_datang`] = true;
+      saveHistory(newHist, todayStr);
       
-    } else {
+    } 
+    else if (jamDesimal > 7.0 && jamDesimal < batasPulang) {
+      // Sama seperti logika Code.gs lama: jika absen di jam sekolah (telat), langsung DITOLAK
+      showResult({
+        nama: profile.nama,
+        detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
+        pesan: "Terlambat! Izin Pimpinan.",
+        status: "DITOLAK",
+        warna: "text-red-500 bg-red-50",
+        foto: profile.foto_url || AVATAR_NETRAL
+      });
+      return;
+      
+    } 
+    else if (jamDesimal >= batasPulang) {
       if (historyLokal.current[`${uidLower}_pulang`]) {
         showResult({
           nama: profile.nama,
@@ -301,7 +343,10 @@ function App() {
       pesan = "Berhasil Absen Pulang";
       status = "PULANG";
       warna = "text-emerald-600 bg-emerald-50";
-      historyLokal.current[`${uidLower}_pulang`] = true;
+      
+      const newHist = { ...historyLokal.current };
+      newHist[`${uidLower}_pulang`] = true;
+      saveHistory(newHist, todayStr);
     }
 
     syncQueue.current.push({
@@ -356,13 +401,13 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0]">
+    <div className="w-screen h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0]">
       
       {/* Layar Redup & Blackout Overlay */}
       <div className={`absolute inset-0 bg-black pointer-events-none z-50 transition-opacity duration-1000 ease-in-out ${overlayOpacityClass}`}></div>
       
       {/* Main Glass/Premium Card Container */}
-      <div className="w-full max-w-[1600px] h-full min-h-[90vh] flex flex-col justify-between bg-white/80 backdrop-blur-3xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-white/60 p-6 md:p-10 relative">
+      <div className="bg-white/80 backdrop-blur-3xl rounded-[2vw] shadow-[0_1vw_3vw_rgba(0,0,0,0.06)] border border-white/60 p-[2.5vw] flex flex-col justify-between relative w-[95vw] h-[92vh]">
         
         <input 
           ref={inputRef}
@@ -376,72 +421,72 @@ function App() {
           autoComplete="off" 
         />
 
-        {/* Top/Middle Section Responsive Layout */}
-        <div className="w-full flex flex-col md:flex-row items-stretch flex-grow gap-8 md:gap-12 mb-8">
+        {/* Layout Split */}
+        <div className="w-full flex flex-row items-stretch flex-grow gap-[4vw] mb-[2vw]">
           
-          {/* Left Panel - Identity & Clock */}
-          <div className="w-full md:w-1/2 flex flex-col justify-center">
+          {/* Left Panel */}
+          <div className="w-1/2 flex flex-col justify-center">
             
-            <div className="flex flex-col items-center md:items-start mb-8 md:mb-12 px-2">
-              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-slate-800 uppercase tracking-tight leading-none mb-3">
+            <div className="flex flex-col items-center mb-[2vw] px-[1vw]">
+              <h1 className="text-[3.5vw] font-black text-slate-800 uppercase tracking-tight leading-none mb-[1vw]">
                 Layar Absensi
               </h1>
-              <div className="flex items-center gap-3">
-                <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-10 h-10 md:w-14 md:h-14 object-contain drop-shadow-sm" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
-                <span className="text-xl md:text-3xl font-bold text-emerald-700 tracking-wide">Madrasah Inovatif</span>
+              <div className="flex items-center gap-[1vw]">
+                <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-[4.5vw] h-[4.5vw] object-contain drop-shadow-sm" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
+                <span className="text-[3vw] font-bold text-emerald-700 tracking-wide leading-none">Madrasah Inovatif</span>
               </div>
             </div>
             
-            <div className="w-full bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2rem] py-10 px-8 flex flex-col justify-center items-center shadow-[0_15px_30px_rgba(5,150,105,0.25)] border border-green-500/30 transform transition-transform duration-300 hover:scale-[1.02]">
-              <div className="text-6xl md:text-8xl lg:text-[7.5rem] font-black text-white tracking-[0.1em] leading-none font-mono drop-shadow-md">
+            <div className="w-full bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-[0_1vw_2vw_rgba(5,150,105,0.25)] border border-green-500/30 transform transition-transform duration-300 hover:scale-[1.02]">
+              <div className="text-[8vw] font-black text-white tracking-[0.1em] leading-none font-mono drop-shadow-md">
                 {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
-              <div className="text-base md:text-2xl font-semibold text-green-100 mt-4 uppercase tracking-widest drop-shadow-sm text-center">
+              <div className="text-[2vw] font-semibold text-green-100 mt-[1.5vw] uppercase tracking-widest drop-shadow-sm text-center">
                 {time.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             </div>
           </div>
 
           {/* Right Panel - NFC Interaction Area */}
-          <div className="w-full md:w-1/2 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 flex flex-col justify-center items-center relative overflow-hidden shadow-inner py-16 md:py-0">
+          <div className="w-1/2 bg-slate-50/50 rounded-[2vw] border border-slate-100 flex flex-col justify-center items-center relative overflow-hidden shadow-inner">
             
             {/* Standby State */}
             <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-700 ease-in-out ${viewState === 'standby' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
               
-              <div className="ripple-container mb-8">
+              <div className="ripple-container mb-[2.5vw]">
                 {/* Ripple Animation Waves */}
                 <div className="ripple-circle"></div>
                 <div className="ripple-circle ripple-delay-1"></div>
                 <div className="ripple-circle ripple-delay-2"></div>
                 
                 {/* Center NFC Icon */}
-                <div className="relative w-32 h-32 md:w-44 md:h-44 rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] ring-1 ring-slate-100 flex items-center justify-center z-10 transform transition-transform hover:scale-110">
-                  <span className="text-5xl md:text-7xl">💳</span>
+                <div className="relative w-[12vw] h-[12vw] rounded-full bg-white shadow-[0_1vw_2vw_rgba(0,0,0,0.08)] ring-1 ring-slate-100 flex items-center justify-center z-10 transform transition-transform hover:scale-110">
+                  <span className="text-[6vw]">💳</span>
                 </div>
               </div>
               
-              <p className="text-xl md:text-3xl font-extrabold text-slate-600 text-center leading-snug tracking-tight">
+              <p className="text-[2vw] font-extrabold text-slate-600 text-center leading-snug tracking-tight mt-[1.5vw]">
                 Silakan Tempelkan<br/>Kartu Anda
               </p>
             </div>
             
             {/* Result State */}
             <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out bg-white/40 backdrop-blur-md ${viewState === 'result' ? 'opacity-100 scale-100' : 'opacity-0 scale-110 pointer-events-none'}`}>
-              <div className={`w-32 h-32 md:w-48 md:h-48 rounded-full border-4 md:border-[6px] overflow-hidden mb-6 shadow-xl bg-white ${resultData?.warna.includes('text-red') ? 'border-red-500 shadow-red-500/20' : (resultData?.warna.includes('text-amber') ? 'border-amber-500 shadow-amber-500/20' : 'border-emerald-600 shadow-emerald-600/20')}`}>
+              <div className={`w-[14vw] h-[14vw] rounded-full border-[0.5vw] overflow-hidden mb-[1.5vw] shadow-xl bg-white ${resultData?.warna.includes('text-red') ? 'border-red-500 shadow-red-500/20' : (resultData?.warna.includes('text-amber') ? 'border-amber-500 shadow-amber-500/20' : 'border-emerald-600 shadow-emerald-600/20')}`}>
                 <img src={resultData?.foto} className="w-full h-full object-cover" alt="Avatar" onError={(e) => e.target.src=AVATAR_NETRAL} />
               </div>
               
-              <h2 className="text-2xl md:text-4xl font-black text-slate-800 text-center leading-tight px-4 max-w-[90%] break-words">
+              <h2 className="text-[3vw] font-black text-slate-800 text-center leading-tight px-[1vw] max-w-[90%] break-words">
                 {resultData?.nama}
               </h2>
               
-              <p className="text-base md:text-xl font-bold text-slate-500 text-center mt-2 px-6 py-1 rounded-full bg-slate-100/80">
+              <p className="text-[1.5vw] font-bold text-slate-500 text-center mt-[0.5vw] px-[1.5vw] py-[0.2vw] rounded-full bg-slate-100/80">
                 {resultData?.detail}
               </p>
               
-              <div className={`mt-6 px-8 py-3 rounded-2xl font-black text-xl md:text-3xl tracking-wide shadow-sm text-center ${resultData?.warna}`}>
+              <div className={`mt-[1.5vw] px-[2vw] py-[0.8vw] rounded-[1vw] font-black text-[2vw] tracking-wide shadow-sm text-center ${resultData?.warna}`}>
                 <p className="block">{resultData?.pesan}</p>
-                <p className="block text-sm md:text-base opacity-80 mt-1 uppercase tracking-widest">{resultData?.status}</p>
+                <p className="block text-[1.2vw] opacity-80 mt-[0.2vw] uppercase tracking-widest">{resultData?.status}</p>
               </div>
             </div>
 
@@ -449,9 +494,9 @@ function App() {
         </div>
 
         {/* Footer */}
-        <div className="text-xs md:text-base font-semibold text-slate-400 w-full flex justify-between items-end border-t border-slate-100 pt-4">
-          <span className="tracking-wide">Sistem Absensi Digital v7.0 (Responsive Premium)</span>
-          <span className={`px-4 py-1.5 rounded-full font-bold transition-all shadow-sm ${queueCount > 0 ? 'text-amber-700 bg-amber-100 animate-pulse' : 'text-emerald-700 bg-emerald-100'}`}>
+        <div className="text-[1.2vw] font-semibold text-slate-400 w-full flex justify-between items-end border-t border-slate-100 pt-[1.5vw]">
+          <span className="tracking-wide">Sistem Absensi Digital v7.1 (Optimized Landscape)</span>
+          <span className={`px-[1.5vw] py-[0.4vw] rounded-full font-bold transition-all shadow-sm ${queueCount > 0 ? 'text-amber-700 bg-amber-100 animate-pulse' : 'text-emerald-700 bg-emerald-100'}`}>
             {syncStatus}
           </span>
         </div>
