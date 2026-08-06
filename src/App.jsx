@@ -43,6 +43,7 @@ function App() {
 
   const profilesCache = useRef({});
   const historyLokal = useRef(loadHistory());
+  const counterHarian = useRef({ datang: 0, pulang: 0, terlambat: 0 });
   const syncQueue = useRef([]);
   const isSyncing = useRef(false);
   
@@ -151,6 +152,7 @@ function App() {
 
         // Mulai dari kosong agar data Supabase menjadi sumber kebenaran utama saat refresh
         const freshHist = {}; 
+        let cDatang = 0, cPulang = 0, cTerlambat = 0;
         const tables = ['absensi_datang', 'absensi_pulang', 'absensi_guru_datang', 'absensi_guru_pulang'];
         
         let fetchHistorySuccess = true;
@@ -160,8 +162,12 @@ function App() {
             if (resAbsen.error) throw resAbsen.error;
             if (resAbsen.data) {
                resAbsen.data.forEach(row => {
-                  const jenis = (row.jenis_absen === "Datang") ? "datang" : "pulang";
+                  const jenis = row.jenis_absen.toLowerCase(); // datang, pulang, terlambat
                   freshHist[`${row.rfid_uid}_${jenis}`] = true;
+                  
+                  if (jenis === 'datang') cDatang++;
+                  else if (jenis === 'pulang') cPulang++;
+                  else if (jenis === 'terlambat') cTerlambat++;
                });
             }
           }
@@ -173,6 +179,15 @@ function App() {
         // Jika berhasil ambil dari server, timpa cache lokal. Jika gagal (offline), pertahankan cache lokal.
         if (fetchHistorySuccess) {
           saveHistory(freshHist, new Date().toDateString());
+          counterHarian.current = { datang: cDatang, pulang: cPulang, terlambat: cTerlambat };
+        } else {
+          // Hitung ulang dari local storage jika offline
+          const keys = Object.keys(historyLokal.current);
+          counterHarian.current = {
+            datang: keys.filter(k => k.endsWith('_datang')).length,
+            pulang: keys.filter(k => k.endsWith('_pulang')).length,
+            terlambat: keys.filter(k => k.endsWith('_terlambat')).length,
+          };
         }
 
         const total = (resMurid.data?.length || 0) + (resGuru.data?.length || 0);
@@ -257,6 +272,7 @@ function App() {
     if (tanggalCounterLokal.current !== todayStr) {
       tanggalCounterLokal.current = todayStr;
       saveHistory({}, todayStr);
+      counterHarian.current = { datang: 0, pulang: 0, terlambat: 0 };
     }
 
     if (!profile) {
@@ -297,6 +313,8 @@ function App() {
     let status = "";
     let warna = "";
 
+    let urutan = 0;
+
     if (jamDesimal < 6.0) {
       showResult({
         nama: profile.nama,
@@ -324,6 +342,9 @@ function App() {
       pesan = "Berhasil Absen Datang";
       status = "DATANG";
       warna = "text-emerald-600 bg-emerald-50";
+      
+      counterHarian.current.datang++;
+      urutan = counterHarian.current.datang;
       
       const newHist = { ...historyLokal.current };
       newHist[`${uidLower}_datang`] = true;
@@ -360,6 +381,9 @@ function App() {
       status = "PULANG";
       warna = "text-emerald-600 bg-emerald-50";
       
+      counterHarian.current.pulang++;
+      urutan = counterHarian.current.pulang;
+      
       const newHist = { ...historyLokal.current };
       newHist[`${uidLower}_pulang`] = true;
       saveHistory(newHist, todayStr);
@@ -382,6 +406,7 @@ function App() {
       pesan: pesan,
       status: status,
       warna: warna,
+      urutan: urutan,
       foto: profile.foto_url || AVATAR_NETRAL
     });
   };
@@ -507,7 +532,9 @@ function App() {
               
               <div className={`mt-[1.5vw] px-[2vw] py-[0.8vw] rounded-[1vw] font-black text-[2vw] tracking-wide shadow-sm text-center ${resultData?.warna}`}>
                 <p className="block">{resultData?.pesan}</p>
-                <p className="block text-[1.2vw] opacity-80 mt-[0.2vw] uppercase tracking-widest">{resultData?.status}</p>
+                <p className="block text-[1.2vw] opacity-80 mt-[0.2vw] uppercase tracking-widest">
+                  {resultData?.status} {resultData?.urutan ? `• URUTAN KE-${resultData.urutan}` : ''}
+                </p>
               </div>
             </div>
 
