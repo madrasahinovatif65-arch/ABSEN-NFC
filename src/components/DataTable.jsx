@@ -32,16 +32,33 @@ function DataTable({ table, title, isLog = false }) {
 
   const fetchData = async () => {
     setLoading(true);
-    let query = supabase.from(table).select('*');
+    
+    let combinedResult = [];
+    
+    // Support array of tables (e.g. for merging datang & pulang)
+    const tablesToFetch = Array.isArray(table) ? table : [table];
+    
+    for (const tbl of tablesToFetch) {
+      let query = supabase.from(tbl).select('*');
+      if (isLog) {
+        query = query.order('waktu', { ascending: false }).limit(100);
+      } else {
+        query = query.order('nama', { ascending: true });
+      }
+      const { data: result, error } = await query;
+      if (!error && result) {
+        combinedResult = [...combinedResult, ...result];
+      }
+    }
+
     if (isLog) {
-      query = query.order('waktu', { ascending: false }).limit(100);
-    } else {
-      query = query.order('nama', { ascending: true });
+      // Sort combined logs by time descending
+      combinedResult.sort((a, b) => new Date(b.waktu) - new Date(a.waktu));
+      // Limit combined results to 200
+      combinedResult = combinedResult.slice(0, 200);
     }
-    const { data: result, error } = await query;
-    if (!error && result) {
-      setData(result);
-    }
+    
+    setData(combinedResult);
     setLoading(false);
   };
 
@@ -57,10 +74,12 @@ function DataTable({ table, title, isLog = false }) {
     e.preventDefault();
     setLoading(true);
     
+    const targetTable = Array.isArray(table) ? table[0] : table;
+    
     if (editingId) {
-      await supabase.from(table).update(formData).eq('rfid_uid', editingId);
+      await supabase.from(targetTable).update(formData).eq('rfid_uid', editingId);
     } else {
-      await supabase.from(table).insert([formData]);
+      await supabase.from(targetTable).insert([formData]);
     }
     
     setIsModalOpen(false);
@@ -72,7 +91,8 @@ function DataTable({ table, title, isLog = false }) {
   const handleDelete = async (id) => {
     if (window.confirm("Yakin ingin menghapus data ini?")) {
       setLoading(true);
-      await supabase.from(table).delete().eq('rfid_uid', id);
+      const targetTable = Array.isArray(table) ? table[0] : table; // For logs, delete might be complex, but they shouldn't delete logs from UI anyway
+      await supabase.from(targetTable).delete().eq('rfid_uid', id);
       fetchData();
     }
   };

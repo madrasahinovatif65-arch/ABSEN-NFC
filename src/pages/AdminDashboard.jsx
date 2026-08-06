@@ -70,8 +70,8 @@ function AdminDashboard() {
             <Route path="/" element={<WelcomeDashboard />} />
             <Route path="/murid" element={<DataTable table="murid" title="Data Murid" />} />
             <Route path="/guru" element={<DataTable table="guru" title="Data Guru" />} />
-            <Route path="/absen-murid" element={<DataTable table="absensi_datang" title="Log Absensi Murid" isLog={true} />} />
-            <Route path="/absen-guru" element={<DataTable table="absensi_guru_datang" title="Log Absensi Guru" isLog={true} />} />
+            <Route path="/absen-murid" element={<DataTable table={['absensi_datang', 'absensi_pulang']} title="Log Absensi Murid" isLog={true} />} />
+            <Route path="/absen-guru" element={<DataTable table={['absensi_guru_datang', 'absensi_guru_pulang']} title="Log Absensi Guru" isLog={true} />} />
           </Routes>
         </div>
       </div>
