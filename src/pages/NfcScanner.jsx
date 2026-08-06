@@ -354,17 +354,28 @@ function NfcScanner() {
       
     } 
     else if (jamDesimal > 7.0 && jamDesimal < batasPulang) {
-      // Sama seperti logika Code.gs lama: jika absen di jam sekolah (telat), langsung DITOLAK
-      showResult({
-        nama: profile.nama,
-        detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
-        pesan: "Terlambat! Izin Pimpinan.",
-        status: "DITOLAK",
-        warna: "text-red-500 bg-red-50",
-        foto: profile.foto_url || AVATAR_NETRAL
-      });
-      return;
+      if (historyLokal.current[`${uidLower}_terlambat`] || historyLokal.current[`${uidLower}_datang`]) {
+        showResult({
+          nama: profile.nama,
+          detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
+          pesan: "Sudah absen DATANG!",
+          status: "DITOLAK",
+          warna: "text-red-500 bg-red-50",
+          foto: profile.foto_url || AVATAR_NETRAL
+        });
+        return;
+      }
+      jenisAbsen = "Terlambat";
+      pesan = "Anda Terlambat";
+      status = "TERLAMBAT";
+      warna = "text-amber-600 bg-amber-50";
       
+      counterHarian.current.terlambat++;
+      urutan = counterHarian.current.terlambat;
+      
+      const newHist = { ...historyLokal.current };
+      newHist[`${uidLower}_terlambat`] = true;
+      saveHistory(newHist, todayStr);
     } 
     else if (jamDesimal >= batasPulang) {
       if (historyLokal.current[`${uidLower}_pulang`]) {
