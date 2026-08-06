@@ -482,6 +482,8 @@ function NfcScanner() {
               <div 
                 className="flex items-center gap-[1vw] cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => navigate('/admin')}
+                onMouseDown={(e) => { e.stopPropagation(); navigate('/admin'); }}
+                onTouchStart={(e) => { e.stopPropagation(); navigate('/admin'); }}
                 title="Masuk ke Panel Admin"
               >
                 <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-[4.5vw] h-[4.5vw] object-contain drop-shadow-sm" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
