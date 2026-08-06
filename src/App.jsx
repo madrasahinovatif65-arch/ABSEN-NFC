@@ -13,7 +13,12 @@ function App() {
   const [syncStatus, setSyncStatus] = useState("Mengunduh Data...");
   const [queueCount, setQueueCount] = useState(0);
   
+  // Idle State (Dimmer)
+  const [isIdle, setIsIdle] = useState(false);
+  const idleTimerRef = useRef(null);
+  
   const inputRef = useRef(null);
+  const wakeLockRef = useRef(null);
   
   // Local Caches
   const profilesCache = useRef({});
@@ -27,23 +32,72 @@ function App() {
   const standbyTimer = useRef(null);
   const tanggalCounterLokal = useRef(new Date().toDateString());
 
-  // Clock Timer
+  // 1. Clock Timer
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Autofocus Input
+  // 2. WakeLock API (Always On)
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      }
+    } catch (err) {
+      console.warn("WakeLock error:", err);
+    }
+  };
+
   useEffect(() => {
-    const focusInput = () => {
-      if (inputRef.current) inputRef.current.focus();
+    requestWakeLock();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
     };
-    focusInput();
-    document.addEventListener('click', focusInput);
-    return () => document.removeEventListener('click', focusInput);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLockRef.current) wakeLockRef.current.release();
+    };
   }, []);
 
-  // Initial Data Fetch
+  // 3. Idle Timer (Dimmer) & Autofocus
+  const resetIdleTimer = () => {
+    setIsIdle(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      setIsIdle(true);
+    }, 30000); // 30 detik idle -> redup
+  };
+
+  useEffect(() => {
+    resetIdleTimer();
+    const handleActivity = () => {
+      resetIdleTimer();
+      // Keep input focused on any interaction
+      if (inputRef.current && document.activeElement !== inputRef.current) {
+        inputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('click', handleActivity);
+    
+    // Initial focus
+    if (inputRef.current) inputRef.current.focus();
+
+    return () => {
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('click', handleActivity);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
+  // 4. Initial Data Fetch
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
@@ -65,7 +119,7 @@ function App() {
     fetchProfiles();
   }, []);
 
-  // Background Sync Worker
+  // 5. Background Sync Worker
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       if (syncQueue.current.length === 0 || isSyncing.current) return;
@@ -93,11 +147,10 @@ function App() {
         }
       } catch (err) {
         console.error("Gagal sync antrean:", err);
-        // Biarkan di antrean untuk dicoba lagi nanti
       } finally {
         isSyncing.current = false;
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000);
 
     return () => clearInterval(syncInterval);
   }, []);
@@ -126,7 +179,6 @@ function App() {
     const uidLower = uid.toLowerCase();
     const profile = profilesCache.current[uidLower];
     
-    // Reset local history if day changes
     if (tanggalCounterLokal.current !== tapTime.toDateString()) {
       historyLokal.current = {};
       tanggalCounterLokal.current = tapTime.toDateString();
@@ -144,7 +196,6 @@ function App() {
       return;
     }
 
-    // Logic Waktu
     const jamDesimal = tapTime.getHours() + (tapTime.getMinutes() / 60);
     const hariID = tapTime.getDay();
     const isGuru = profile.role === 'guru';
@@ -236,16 +287,14 @@ function App() {
       historyLokal.current[`${uidLower}_pulang`] = true;
     }
 
-    // Add to sync queue
     syncQueue.current.push({
       uid: uidLower,
       jenis_absen: jenisAbsen,
-      waktu: tapTime.toISOString() // Catat waktu asli saat tap
+      waktu: tapTime.toISOString()
     });
     setQueueCount(syncQueue.current.length);
     setSyncStatus(`⏳ Antrean: ${syncQueue.current.length}`);
 
-    // Optimistic UI Update (Instant Response)
     showResult({
       nama: profile.nama,
       detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
@@ -263,11 +312,35 @@ function App() {
     if (standbyTimer.current) clearTimeout(standbyTimer.current);
     standbyTimer.current = setTimeout(() => {
       setViewState('standby');
-    }, 3500); // 3.5 detik ditahan agar mudah dibaca
+    }, 3500);
   };
+
+  // Logic Jam Aktif & Blackout
+  const jamDesimal = time.getHours() + (time.getMinutes() / 60);
+  const hariID = time.getDay();
+  const isMinggu = (hariID === 0);
+  
+  let isActiveHour = false;
+  if (!isMinggu) {
+    if ((jamDesimal >= 6.0 && jamDesimal <= 7.0) || (jamDesimal >= 9.0 && jamDesimal <= 13.0)) {
+      isActiveHour = true;
+    }
+  }
+
+  // Overlay Opacity Logic
+  let overlayOpacityClass = "opacity-0";
+  if (!isActiveHour) {
+    overlayOpacityClass = "opacity-100"; // Blackout mati total
+  } else if (isIdle) {
+    overlayOpacityClass = "opacity-65"; // Redup setelah 30s
+  }
 
   return (
     <div className="w-full h-full flex items-center justify-center p-2 relative overflow-hidden bg-gradient-to-br from-[#e8f5e9] to-[#c8e6c9]">
+      
+      {/* Layar Redup & Blackout Overlay */}
+      <div className={`absolute inset-0 bg-black pointer-events-none z-50 transition-opacity duration-1000 ease-in-out ${overlayOpacityClass}`}></div>
+      
       <div className="dashboard-canvas bg-white/80 backdrop-blur-xl border border-white/40 rounded-[2vw] shadow-2xl p-[3vw] flex flex-col justify-between relative w-[96vw] h-[92vh]">
         
         <input 
@@ -276,6 +349,7 @@ function App() {
           value={nfcInput}
           onChange={(e) => setNfcInput(e.target.value)}
           onKeyPress={handleKeyPress}
+          onBlur={() => setTimeout(() => inputRef.current?.focus(), 10)}
           className="absolute left-[-9999px] opacity-0"
           autoFocus
           autoComplete="off" 
@@ -344,7 +418,7 @@ function App() {
 
         {/* Footer */}
         <div className="text-[1.4vw] font-semibold text-slate-400 pt-[1.5vw] border-t border-slate-200/60 w-full flex justify-between items-center">
-          <span>Sistem Absensi Digital v5.1 (Optimized)</span>
+          <span>Sistem Absensi Digital v5.2 (Dimmer & WakeLock)</span>
           <span className={`font-bold px-[1vw] py-[0.2vw] rounded-full transition-colors ${queueCount > 0 ? 'text-amber-600 bg-amber-50 animate-pulse' : 'text-green-600 bg-green-50'}`}>
             {syncStatus}
           </span>
