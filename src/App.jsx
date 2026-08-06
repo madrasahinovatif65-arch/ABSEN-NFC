@@ -84,6 +84,7 @@ function App() {
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('keydown', handleActivity);
     window.addEventListener('click', handleActivity);
+    window.addEventListener('touchstart', handleActivity); // untuk mobile
     
     if (inputRef.current) inputRef.current.focus();
 
@@ -91,17 +92,17 @@ function App() {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
       window.removeEventListener('click', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
   }, []);
 
-  // 4. Initial Data Fetch (Dua Tabel: Murid & Guru)
+  // 4. Initial Data Fetch
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
         const cache = {};
         
-        // Fetch Murid
         const resMurid = await supabase.from('murid').select('*');
         if (resMurid.data) {
           resMurid.data.forEach(p => {
@@ -109,7 +110,6 @@ function App() {
           });
         }
         
-        // Fetch Guru
         const resGuru = await supabase.from('guru').select('*');
         if (resGuru.data) {
           resGuru.data.forEach(p => {
@@ -129,7 +129,7 @@ function App() {
     fetchProfiles();
   }, []);
 
-  // 5. Background Sync Worker (Target Tabel Terpisah)
+  // 5. Background Sync Worker
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       if (syncQueue.current.length === 0 || isSyncing.current) return;
@@ -138,7 +138,6 @@ function App() {
       const currentItem = syncQueue.current[0];
       
       try {
-        // Tentukan Nama Tabel berdasarkan role & jenis absen
         let targetTable = '';
         if (currentItem.role === 'guru') {
           targetTable = currentItem.jenis_absen === 'Pulang' ? 'absensi_guru_pulang' : 'absensi_guru_datang';
@@ -204,11 +203,11 @@ function App() {
 
     if (!profile) {
       showResult({
-        nama: "Kartu Tidak Terdaftar!",
-        detail: "-",
-        pesan: "Hubungi Admin",
+        nama: "Kartu Tidak Dikenal",
+        detail: "Akses Ditolak",
+        pesan: "Silakan hubungi admin.",
         status: "DITOLAK",
-        warna: "bg-red-500",
+        warna: "text-red-500 bg-red-50",
         foto: AVATAR_NETRAL
       });
       return;
@@ -224,7 +223,7 @@ function App() {
         detail: `Jabatan: ${profile.detail}`,
         pesan: "Hari Minggu Libur!",
         status: "DITOLAK",
-        warna: "bg-red-500",
+        warna: "text-red-500 bg-red-50",
         foto: profile.foto_url || AVATAR_NETRAL
       });
       return;
@@ -246,7 +245,7 @@ function App() {
         detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
         pesan: "Belum waktunya absen!",
         status: "DITOLAK",
-        warna: "bg-amber-500 text-white",
+        warna: "text-amber-600 bg-amber-50",
         foto: profile.foto_url || AVATAR_NETRAL
       });
       return;
@@ -257,7 +256,7 @@ function App() {
           detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
           pesan: "Sudah absen DATANG!",
           status: "DITOLAK",
-          warna: "bg-red-500",
+          warna: "text-red-500 bg-red-50",
           foto: profile.foto_url || AVATAR_NETRAL
         });
         return;
@@ -265,7 +264,7 @@ function App() {
       jenisAbsen = "Datang";
       pesan = "Berhasil Absen Datang";
       status = "DATANG";
-      warna = "bg-green-600 text-white";
+      warna = "text-emerald-600 bg-emerald-50";
       historyLokal.current[`${uidLower}_datang`] = true;
       
     } else if (jamDesimal > 7.0 && jamDesimal < batasPulang) {
@@ -275,7 +274,7 @@ function App() {
           detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
           pesan: "Sudah tercatat TERLAMBAT!",
           status: "DITOLAK",
-          warna: "bg-red-500",
+          warna: "text-red-500 bg-red-50",
           foto: profile.foto_url || AVATAR_NETRAL
         });
         return;
@@ -283,7 +282,7 @@ function App() {
       jenisAbsen = "Terlambat";
       pesan = "Tercatat Terlambat!";
       status = "TERLAMBAT";
-      warna = "bg-amber-500 text-white";
+      warna = "text-amber-600 bg-amber-50";
       historyLokal.current[`${uidLower}_terlambat`] = true;
       
     } else {
@@ -293,7 +292,7 @@ function App() {
           detail: `${isGuru ? 'Jabatan' : 'Kelas'}: ${profile.detail}`,
           pesan: "Sudah absen PULANG!",
           status: "DITOLAK",
-          warna: "bg-red-500",
+          warna: "text-red-500 bg-red-50",
           foto: profile.foto_url || AVATAR_NETRAL
         });
         return;
@@ -301,11 +300,10 @@ function App() {
       jenisAbsen = "Pulang";
       pesan = "Berhasil Absen Pulang";
       status = "PULANG";
-      warna = "bg-green-600 text-white";
+      warna = "text-emerald-600 bg-emerald-50";
       historyLokal.current[`${uidLower}_pulang`] = true;
     }
 
-    // Antrekan sinkronisasi ke spesifik tabel
     syncQueue.current.push({
       uid: uidLower,
       nama: profile.nama,
@@ -334,7 +332,7 @@ function App() {
     if (standbyTimer.current) clearTimeout(standbyTimer.current);
     standbyTimer.current = setTimeout(() => {
       setViewState('standby');
-    }, 3500);
+    }, 4000);
   };
 
   // Logic Jam Aktif & Blackout
@@ -349,21 +347,22 @@ function App() {
     }
   }
 
-  // Overlay Opacity Logic
+  // Overlay Opacity Logic (Diperbaiki)
   let overlayOpacityClass = "opacity-0";
   if (!isActiveHour) {
     overlayOpacityClass = "opacity-100"; // Blackout mati total
   } else if (isIdle) {
-    overlayOpacityClass = "opacity-65"; // Redup setelah 30s
+    overlayOpacityClass = "opacity-70"; // Redup setelah 30s
   }
 
   return (
-    <div className="w-screen h-screen flex items-center justify-center relative overflow-hidden bg-[#eaf4eb]">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 relative overflow-hidden bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0]">
       
       {/* Layar Redup & Blackout Overlay */}
       <div className={`absolute inset-0 bg-black pointer-events-none z-50 transition-opacity duration-1000 ease-in-out ${overlayOpacityClass}`}></div>
       
-      <div className="bg-white rounded-[1.5vw] flex flex-col justify-between relative w-[95vw] h-[92vh] p-[2.5vw] shadow-[0_0_15px_rgba(0,0,0,0.05)]">
+      {/* Main Glass/Premium Card Container */}
+      <div className="w-full max-w-[1600px] h-full min-h-[90vh] flex flex-col justify-between bg-white/80 backdrop-blur-3xl rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.06)] border border-white/60 p-6 md:p-10 relative">
         
         <input 
           ref={inputRef}
@@ -377,71 +376,82 @@ function App() {
           autoComplete="off" 
         />
 
-        <div className="w-full flex flex-row items-stretch flex-grow gap-[4vw]">
+        {/* Top/Middle Section Responsive Layout */}
+        <div className="w-full flex flex-col md:flex-row items-stretch flex-grow gap-8 md:gap-12 mb-8">
           
-          {/* Left Panel */}
-          <div className="w-1/2 flex flex-col justify-center">
-            <div className="flex flex-col items-center mb-[1.5vw]">
-              <h1 className="text-[3.2vw] font-black text-[#1e293b] uppercase tracking-wide leading-none">
-                LAYAR ABSENSI
+          {/* Left Panel - Identity & Clock */}
+          <div className="w-full md:w-1/2 flex flex-col justify-center">
+            
+            <div className="flex flex-col items-center md:items-start mb-8 md:mb-12 px-2">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-slate-800 uppercase tracking-tight leading-none mb-3">
+                Layar Absensi
               </h1>
-              <div className="flex items-center gap-[0.8vw] mt-[0.8vw]">
-                <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-[3.5vw] h-[3.5vw] object-contain" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
-                <span className="text-[2.6vw] font-bold text-[#15803d] tracking-normal leading-none">Madrasah Inovatif</span>
+              <div className="flex items-center gap-3">
+                <img src="https://lh3.googleusercontent.com/d/1k4q401pC_PhtybY9T73snaJj6WzONMds" className="w-10 h-10 md:w-14 md:h-14 object-contain drop-shadow-sm" onError={(e) => e.target.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'} alt="Logo" />
+                <span className="text-xl md:text-3xl font-bold text-emerald-700 tracking-wide">Madrasah Inovatif</span>
               </div>
             </div>
             
-            <div className="w-full bg-[#108146] rounded-[1vw] py-[2.5vw] px-[3vw] flex flex-col justify-center items-center shadow-md">
-              <div className="text-[7.5vw] font-bold text-white tracking-[0.15em] leading-none font-mono">
+            <div className="w-full bg-gradient-to-br from-emerald-600 to-green-700 rounded-[2rem] py-10 px-8 flex flex-col justify-center items-center shadow-[0_15px_30px_rgba(5,150,105,0.25)] border border-green-500/30 transform transition-transform duration-300 hover:scale-[1.02]">
+              <div className="text-6xl md:text-8xl lg:text-[7.5rem] font-black text-white tracking-[0.1em] leading-none font-mono drop-shadow-md">
                 {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
-              <div className="text-[1.6vw] font-medium text-white mt-[1vw] uppercase tracking-wider">
+              <div className="text-base md:text-2xl font-semibold text-green-100 mt-4 uppercase tracking-widest drop-shadow-sm text-center">
                 {time.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             </div>
           </div>
 
-          {/* Right Panel */}
-          <div className="w-1/2 bg-[#f8faf9] rounded-[1.2vw] flex flex-col justify-center items-center relative overflow-hidden">
+          {/* Right Panel - NFC Interaction Area */}
+          <div className="w-full md:w-1/2 bg-slate-50/50 rounded-[2.5rem] border border-slate-100 flex flex-col justify-center items-center relative overflow-hidden shadow-inner py-16 md:py-0">
             
-            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-opacity duration-300 ${viewState === 'standby' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <div className="relative w-[16vw] h-[16vw] rounded-full bg-white border border-gray-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-center mb-[2.5vw]">
-                 {/* Outer rings */}
-                <div className="absolute inset-[-3.5vw] rounded-full border border-[#f0f4f0] -z-10"></div>
-                <div className="absolute inset-[-7vw] rounded-full border border-[#f0f4f0] -z-10"></div>
+            {/* Standby State */}
+            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-700 ease-in-out ${viewState === 'standby' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
+              
+              <div className="ripple-container mb-8">
+                {/* Ripple Animation Waves */}
+                <div className="ripple-circle"></div>
+                <div className="ripple-circle ripple-delay-1"></div>
+                <div className="ripple-circle ripple-delay-2"></div>
                 
-                {/* The card icon (You can replace this emoji with an SVG if needed, but styling closely matches) */}
-                <div className="text-[6.5vw] text-[#0ea5e9]">💳</div>
+                {/* Center NFC Icon */}
+                <div className="relative w-32 h-32 md:w-44 md:h-44 rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.08)] ring-1 ring-slate-100 flex items-center justify-center z-10 transform transition-transform hover:scale-110">
+                  <span className="text-5xl md:text-7xl">💳</span>
+                </div>
               </div>
-              <p className="text-[1.8vw] font-bold text-[#475569] text-center leading-snug">
-                Silakan Tempelkan<br/>Kartu Anda...
+              
+              <p className="text-xl md:text-3xl font-extrabold text-slate-600 text-center leading-snug tracking-tight">
+                Silakan Tempelkan<br/>Kartu Anda
               </p>
             </div>
             
-            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-opacity duration-300 ${viewState === 'result' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <div className="w-[14vw] h-[14vw] rounded-full border-[0.4vw] border-[#15803d] overflow-hidden mb-[1.5vw] bg-white shadow-md">
+            {/* Result State */}
+            <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out bg-white/40 backdrop-blur-md ${viewState === 'result' ? 'opacity-100 scale-100' : 'opacity-0 scale-110 pointer-events-none'}`}>
+              <div className={`w-32 h-32 md:w-48 md:h-48 rounded-full border-4 md:border-[6px] overflow-hidden mb-6 shadow-xl bg-white ${resultData?.warna.includes('text-red') ? 'border-red-500 shadow-red-500/20' : (resultData?.warna.includes('text-amber') ? 'border-amber-500 shadow-amber-500/20' : 'border-emerald-600 shadow-emerald-600/20')}`}>
                 <img src={resultData?.foto} className="w-full h-full object-cover" alt="Avatar" onError={(e) => e.target.src=AVATAR_NETRAL} />
               </div>
               
-              <h2 className="text-[2.2vw] font-extrabold text-[#1e293b] text-center leading-tight px-[1vw]">
+              <h2 className="text-2xl md:text-4xl font-black text-slate-800 text-center leading-tight px-4 max-w-[90%] break-words">
                 {resultData?.nama}
               </h2>
               
-              <p className="text-[1.4vw] font-semibold text-[#64748b] text-center mt-[0.3vw]">
+              <p className="text-base md:text-xl font-bold text-slate-500 text-center mt-2 px-6 py-1 rounded-full bg-slate-100/80">
                 {resultData?.detail}
               </p>
               
-              <p className={`text-[1.8vw] font-black text-center mt-[1vw] ${resultData?.warna.includes('bg-red') ? 'text-red-600' : (resultData?.warna.includes('bg-amber') ? 'text-amber-600' : 'text-[#15803d]')}`}>
-                {resultData?.pesan}
-              </p>
+              <div className={`mt-6 px-8 py-3 rounded-2xl font-black text-xl md:text-3xl tracking-wide shadow-sm text-center ${resultData?.warna}`}>
+                <p className="block">{resultData?.pesan}</p>
+                <p className="block text-sm md:text-base opacity-80 mt-1 uppercase tracking-widest">{resultData?.status}</p>
+              </div>
             </div>
+
           </div>
         </div>
 
         {/* Footer */}
-        <div className="text-[1.1vw] font-semibold text-[#94a3b8] w-full flex justify-between items-end mt-[2vw]">
-          <span>Sistem Absensi Digital v4.4</span>
-          <span className={`font-bold transition-colors ${queueCount > 0 ? 'text-amber-500' : 'text-[#15803d]'}`}>
+        <div className="text-xs md:text-base font-semibold text-slate-400 w-full flex justify-between items-end border-t border-slate-100 pt-4">
+          <span className="tracking-wide">Sistem Absensi Digital v7.0 (Responsive Premium)</span>
+          <span className={`px-4 py-1.5 rounded-full font-bold transition-all shadow-sm ${queueCount > 0 ? 'text-amber-700 bg-amber-100 animate-pulse' : 'text-emerald-700 bg-emerald-100'}`}>
             {syncStatus}
           </span>
         </div>
