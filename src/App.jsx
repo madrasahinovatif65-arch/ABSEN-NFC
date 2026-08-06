@@ -76,7 +76,6 @@ function App() {
     resetIdleTimer();
     const handleActivity = () => {
       resetIdleTimer();
-      // Keep input focused on any interaction
       if (inputRef.current && document.activeElement !== inputRef.current) {
         inputRef.current.focus();
       }
@@ -86,7 +85,6 @@ function App() {
     window.addEventListener('keydown', handleActivity);
     window.addEventListener('click', handleActivity);
     
-    // Initial focus
     if (inputRef.current) inputRef.current.focus();
 
     return () => {
@@ -97,19 +95,31 @@ function App() {
     };
   }, []);
 
-  // 4. Initial Data Fetch
+  // 4. Initial Data Fetch (Dua Tabel: Murid & Guru)
   useEffect(() => {
     const fetchProfiles = async () => {
       try {
-        const { data, error } = await supabase.from('profiles').select('*');
-        if (error) throw error;
-        
         const cache = {};
-        data.forEach(p => {
-          cache[p.rfid_uid] = p;
-        });
+        
+        // Fetch Murid
+        const resMurid = await supabase.from('murid').select('*');
+        if (resMurid.data) {
+          resMurid.data.forEach(p => {
+            cache[p.rfid_uid] = { ...p, role: 'murid' };
+          });
+        }
+        
+        // Fetch Guru
+        const resGuru = await supabase.from('guru').select('*');
+        if (resGuru.data) {
+          resGuru.data.forEach(p => {
+            cache[p.rfid_uid] = { ...p, role: 'guru' };
+          });
+        }
+
         profilesCache.current = cache;
-        setSyncStatus(`✓ Sistem Siap (${data.length} Data)`);
+        const total = (resMurid.data?.length || 0) + (resGuru.data?.length || 0);
+        setSyncStatus(`✓ Sistem Siap (${total} Data)`);
       } catch (err) {
         console.error("Gagal memuat profil:", err);
         setSyncStatus("⚠️ Gagal memuat data. Periksa koneksi.");
@@ -119,7 +129,7 @@ function App() {
     fetchProfiles();
   }, []);
 
-  // 5. Background Sync Worker
+  // 5. Background Sync Worker (Target Tabel Terpisah)
   useEffect(() => {
     const syncInterval = setInterval(async () => {
       if (syncQueue.current.length === 0 || isSyncing.current) return;
@@ -128,15 +138,24 @@ function App() {
       const currentItem = syncQueue.current[0];
       
       try {
-        const { error } = await supabase.from('attendance').insert([{
+        // Tentukan Nama Tabel berdasarkan role & jenis absen
+        let targetTable = '';
+        if (currentItem.role === 'guru') {
+          targetTable = currentItem.jenis_absen === 'Pulang' ? 'absensi_guru_pulang' : 'absensi_guru_datang';
+        } else {
+          targetTable = currentItem.jenis_absen === 'Pulang' ? 'absensi_pulang' : 'absensi_datang';
+        }
+
+        const { error } = await supabase.from(targetTable).insert([{
           rfid_uid: currentItem.uid,
+          nama: currentItem.nama,
+          detail: currentItem.detail,
           jenis_absen: currentItem.jenis_absen,
           waktu: currentItem.waktu
         }]);
         
         if (error) throw error;
         
-        // Remove from queue on success
         syncQueue.current.shift();
         setQueueCount(syncQueue.current.length);
         
@@ -146,7 +165,7 @@ function App() {
           setSyncStatus(`⏳ Antrean: ${syncQueue.current.length}`);
         }
       } catch (err) {
-        console.error("Gagal sync antrean:", err);
+        console.error(`Gagal sync antrean ke tabel:`, err);
       } finally {
         isSyncing.current = false;
       }
@@ -161,7 +180,6 @@ function App() {
       const sekarang = Date.now();
       
       if (val !== "") {
-        // Prevent duplicate fast scans
         if (val === uidTerakhir.current && (sekarang - waktuScanTerakhir.current) < 4000) {
           setNfcInput("");
           return;
@@ -287,8 +305,12 @@ function App() {
       historyLokal.current[`${uidLower}_pulang`] = true;
     }
 
+    // Antrekan sinkronisasi ke spesifik tabel
     syncQueue.current.push({
       uid: uidLower,
+      nama: profile.nama,
+      detail: profile.detail,
+      role: profile.role,
       jenis_absen: jenisAbsen,
       waktu: tapTime.toISOString()
     });
@@ -316,13 +338,13 @@ function App() {
   };
 
   // Logic Jam Aktif & Blackout
-  const jamDesimal = time.getHours() + (time.getMinutes() / 60);
-  const hariID = time.getDay();
-  const isMinggu = (hariID === 0);
+  const currentJamDesimal = time.getHours() + (time.getMinutes() / 60);
+  const currentHariID = time.getDay();
+  const isHariMinggu = (currentHariID === 0);
   
   let isActiveHour = false;
-  if (!isMinggu) {
-    if ((jamDesimal >= 6.0 && jamDesimal <= 7.0) || (jamDesimal >= 9.0 && jamDesimal <= 13.0)) {
+  if (!isHariMinggu) {
+    if ((currentJamDesimal >= 6.0 && currentJamDesimal <= 7.0) || (currentJamDesimal >= 9.0 && currentJamDesimal <= 13.0)) {
       isActiveHour = true;
     }
   }
@@ -418,7 +440,7 @@ function App() {
 
         {/* Footer */}
         <div className="text-[1.4vw] font-semibold text-slate-400 pt-[1.5vw] border-t border-slate-200/60 w-full flex justify-between items-center">
-          <span>Sistem Absensi Digital v5.2 (Dimmer & WakeLock)</span>
+          <span>Sistem Absensi Digital v6.0 (Tabel Terpisah)</span>
           <span className={`font-bold px-[1vw] py-[0.2vw] rounded-full transition-colors ${queueCount > 0 ? 'text-amber-600 bg-amber-50 animate-pulse' : 'text-green-600 bg-green-50'}`}>
             {syncStatus}
           </span>
