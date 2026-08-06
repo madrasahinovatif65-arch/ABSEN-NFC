@@ -21,8 +21,13 @@ function AdminLogin({ onLogin }) {
         <form onSubmit={handleSubmit} className="w-full flex flex-col items-center">
           <input
             type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (/^\d*$/.test(val)) setPin(val);
+            }}
             className="w-full text-center text-3xl font-bold tracking-[0.5em] p-3 border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none mb-4"
             placeholder="••••••"
             maxLength={6}

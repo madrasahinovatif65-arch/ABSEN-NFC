@@ -199,10 +199,10 @@ function DataTable({ table, masterTable, title, isLog = false }) {
   return (
     <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
       {/* Header */}
-      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+      <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col xl:flex-row justify-between items-start xl:items-center bg-slate-50/50 gap-4">
         <h2 className="text-xl font-bold text-slate-800">{title}</h2>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center gap-3 w-full xl:w-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
@@ -210,7 +210,7 @@ function DataTable({ table, masterTable, title, isLog = false }) {
               placeholder="Cari nama atau UID..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none w-56 text-sm"
+              className="pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none w-full md:w-56 text-sm"
             />
           </div>
 
@@ -249,7 +249,7 @@ function DataTable({ table, masterTable, title, isLog = false }) {
           {!isLog && (
             <button 
               onClick={openAdd}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors"
+              className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-colors w-full md:w-auto"
             >
               <Plus size={18} /> Tambah Data
             </button>
@@ -264,7 +264,7 @@ function DataTable({ table, masterTable, title, isLog = false }) {
             <Loader2 className="animate-spin text-emerald-500" size={32} />
           </div>
         ) : (
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead className="bg-slate-50 sticky top-0 z-10">
               <tr>
                 <th onClick={() => handleSort('rfid_uid')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">

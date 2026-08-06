@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Users, UserSquare2, Clock, History, LayoutDashboard, LogOut } from 'lucide-react';
+import { Users, UserSquare2, Clock, History, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
 import AdminLogin from '../components/AdminLogin';
 import DataTable from '../components/DataTable';
 
 function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
   if (!isAuthenticated) {
@@ -23,16 +24,42 @@ function AdminDashboard() {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm">
-        <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-black text-xl">
+      {/* Mobile Header */}
+      <div className="md:hidden absolute top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-20 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 font-black text-sm">
             A
           </div>
-          <div>
-            <h1 className="font-bold text-slate-800 leading-tight">Panel Admin</h1>
-            <p className="text-xs text-slate-500">Madrasah Inovatif</p>
+          <h1 className="font-bold text-slate-800">Panel Admin</h1>
+        </div>
+        <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg">
+          <Menu size={24} />
+        </button>
+      </div>
+
+      {/* Sidebar Overlay for Mobile */}
+      {sidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-slate-900/50 z-30 transition-opacity" 
+          onClick={() => setSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-white border-r border-slate-200 flex flex-col shadow-sm z-40`}>
+        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-black text-xl">
+              A
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-800 leading-tight">Panel Admin</h1>
+              <p className="text-xs text-slate-500">Madrasah Inovatif</p>
+            </div>
           </div>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden p-2 text-slate-400 hover:text-slate-600">
+            <X size={20} />
+          </button>
         </div>
         
         <nav className="flex-1 p-4 flex flex-col gap-2 overflow-y-auto">
@@ -40,6 +67,7 @@ function AdminDashboard() {
             <Link 
               key={item.path} 
               to={item.path}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${
                 location.pathname === item.path 
                 ? 'bg-emerald-50 text-emerald-600' 
@@ -64,8 +92,8 @@ function AdminDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="flex-1 overflow-y-auto p-8">
+      <div className="flex-1 flex flex-col overflow-hidden relative pt-16 md:pt-0">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <Routes>
             <Route path="/" element={<WelcomeDashboard />} />
             <Route path="/murid" element={<DataTable table="murid" title="Data Murid" />} />
