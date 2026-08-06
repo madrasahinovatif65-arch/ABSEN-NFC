@@ -471,7 +471,7 @@ function App() {
         <div className="w-full flex flex-row items-stretch flex-grow gap-[4vw] mb-[2vw]">
           
           {/* Left Panel */}
-          <div className="w-1/2 flex flex-col justify-center">
+          <div className="flex-1 flex flex-col justify-center">
             
             <div className="flex flex-col items-center mb-[2vw] px-[1vw]">
               <h1 className="text-[3.5vw] font-black text-slate-800 uppercase tracking-tight leading-none mb-[1vw]">
@@ -484,7 +484,7 @@ function App() {
             </div>
             
             <div className="w-full bg-gradient-to-b from-[#22a44d] to-[#067734] rounded-[1.2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-green-500/20 transform transition-transform duration-300 hover:scale-[1.02]">
-              <div className="text-[8.5vw] font-bold text-white tracking-[0.05em] leading-none font-mono drop-shadow-sm">
+              <div className="text-[7.5vw] font-bold text-white tracking-[0.05em] leading-none font-mono drop-shadow-sm">
                 {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
               <div className="text-[2.2vw] font-bold text-white mt-[1vw] uppercase tracking-wide drop-shadow-sm text-center">
@@ -494,7 +494,7 @@ function App() {
           </div>
 
           {/* Right Panel - NFC Interaction Area */}
-          <div className="w-1/2 bg-slate-50/50 rounded-[2vw] border border-slate-100 flex flex-col justify-center items-center relative overflow-hidden shadow-inner">
+          <div className="flex-1 bg-slate-50/50 rounded-[2vw] border border-slate-100 flex flex-col justify-center items-center relative overflow-hidden shadow-inner">
             
             {/* Standby State */}
             <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-700 ease-in-out ${viewState === 'standby' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
