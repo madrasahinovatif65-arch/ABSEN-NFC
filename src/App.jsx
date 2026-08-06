@@ -483,8 +483,8 @@ function App() {
               </div>
             </div>
             
-            <div className="w-full bg-gradient-to-b from-[#22a44d] to-[#067734] rounded-[1.2vw] py-[2.5vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-green-500/20 transform transition-transform duration-300 hover:scale-[1.02]">
-              <div className="text-[10.5vw] font-bold text-white tracking-widest leading-none font-mono drop-shadow-sm">
+            <div className="w-full bg-gradient-to-b from-[#22a44d] to-[#067734] rounded-[1.2vw] py-[3vw] px-[3vw] flex flex-col justify-center items-center shadow-lg border border-green-500/20 transform transition-transform duration-300 hover:scale-[1.02]">
+              <div className="text-[8.5vw] font-bold text-white tracking-[0.05em] leading-none font-mono drop-shadow-sm">
                 {time.toLocaleTimeString('id-ID', { hour12: false }).replace(/:/g, '.')}
               </div>
               <div className="text-[2.2vw] font-bold text-white mt-[1vw] uppercase tracking-wide drop-shadow-sm text-center">
