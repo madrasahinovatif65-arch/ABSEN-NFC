@@ -4,6 +4,8 @@ import { Plus, Trash2, Edit2, Search, X, Loader2, ScanLine, Upload, Download, Ch
 import Papa from 'papaparse';
 
 function DataTable({ table, masterTable, title, isLog = false, userType }) {
+  const READ_ONLY_MASTER = true; // Fitur edit dimatikan karena tersentralisasi di SIAKAD
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -340,7 +342,7 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
             </>
           )}
           
-          {!isLog && (
+          {!isLog && !READ_ONLY_MASTER && (
             <div className="flex flex-wrap gap-2">
               {selectedIds.length > 0 && (
                 <button 
@@ -379,7 +381,7 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
               <tr>
-                {!isLog && (
+                {!isLog && !READ_ONLY_MASTER && (
                   <th className="px-6 py-4 w-12 border-b border-slate-200">
                     <input 
                       type="checkbox"
@@ -403,15 +405,15 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
                     <th onClick={() => handleSort('waktu_datang')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">Waktu Datang <SortIcon columnKey="waktu_datang" /></th>
                     <th onClick={() => handleSort('waktu_pulang')} className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors select-none">Waktu Pulang <SortIcon columnKey="waktu_pulang" /></th>
                   </>
-                ) : (
+                ) : !READ_ONLY_MASTER ? (
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right">Aksi</th>
-                )}
+                ) : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.length > 0 ? filteredData.map((row, idx) => (
                 <tr key={idx} className={`hover:bg-slate-50/80 transition-colors ${selectedIds.includes(row.rfid_uid) ? 'bg-emerald-50/50' : ''}`}>
-                  {!isLog && (
+                  {!isLog && !READ_ONLY_MASTER && (
                     <td className="px-6 py-4">
                       <input 
                         type="checkbox"
@@ -446,12 +448,12 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
                         )}
                       </td>
                     </>
-                  ) : (
+                  ) : !READ_ONLY_MASTER ? (
                     <td className="px-6 py-4 text-right">
                       <button onClick={() => openEdit(row)} className="text-blue-500 hover:text-blue-700 p-2"><Edit2 size={16} /></button>
                       <button onClick={() => handleDelete(row.rfid_uid)} className="text-red-500 hover:text-red-700 p-2 ml-2"><Trash2 size={16} /></button>
                     </td>
-                  )}
+                  ) : null}
                 </tr>
               )) : (
                 <tr><td colSpan={isLog ? 5 : 5} className="text-center py-10 text-slate-500">Tidak ada data ditemukan.</td></tr>
