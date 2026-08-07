@@ -155,23 +155,19 @@ function NfcScanner() {
         // Mulai dari kosong agar data Supabase menjadi sumber kebenaran utama saat refresh
         const freshHist = {}; 
         let cDatang = 0, cPulang = 0, cTerlambat = 0;
-        const tables = ['absensi_datang', 'absensi_pulang', 'absensi_guru_datang', 'absensi_guru_pulang'];
-        
         let fetchHistorySuccess = true;
         try {
-          for (const tbl of tables) {
-            const resAbsen = await supabase.from(tbl).select('rfid_uid, jenis_absen').gte('waktu', todayISO);
-            if (resAbsen.error) throw resAbsen.error;
-            if (resAbsen.data) {
-               resAbsen.data.forEach(row => {
-                  const jenis = row.jenis_absen.toLowerCase(); // datang, pulang, terlambat
-                  freshHist[`${row.rfid_uid}_${jenis}`] = true;
-                  
-                  if (jenis === 'datang') cDatang++;
-                  else if (jenis === 'pulang') cPulang++;
-                  else if (jenis === 'terlambat') cTerlambat++;
-               });
-            }
+          const resAbsen = await supabase.from('log_absensi').select('rfid_uid, jenis_absen').gte('waktu', todayISO);
+          if (resAbsen.error) throw resAbsen.error;
+          if (resAbsen.data) {
+             resAbsen.data.forEach(row => {
+                const jenis = row.jenis_absen.toLowerCase(); // datang, pulang, terlambat
+                freshHist[`${row.rfid_uid}_${jenis}`] = true;
+                
+                if (jenis === 'datang') cDatang++;
+                else if (jenis === 'pulang') cPulang++;
+                else if (jenis === 'terlambat') cTerlambat++;
+             });
           }
         } catch (e) {
           fetchHistorySuccess = false;
@@ -212,17 +208,9 @@ function NfcScanner() {
       const currentItem = syncQueue.current[0];
       
       try {
-        let targetTable = '';
-        if (currentItem.role === 'guru') {
-          targetTable = currentItem.jenis_absen === 'Pulang' ? 'absensi_guru_pulang' : 'absensi_guru_datang';
-        } else {
-          targetTable = currentItem.jenis_absen === 'Pulang' ? 'absensi_pulang' : 'absensi_datang';
-        }
-
-        const { error } = await supabase.from(targetTable).insert([{
+        const { error } = await supabase.from('log_absensi').insert([{
           rfid_uid: currentItem.uid,
-          nama: currentItem.nama,
-          detail: currentItem.detail,
+          user_type: currentItem.role,
           jenis_absen: currentItem.jenis_absen,
           waktu: currentItem.waktu
         }]);
@@ -404,8 +392,6 @@ function NfcScanner() {
 
     syncQueue.current.push({
       uid: uidLower,
-      nama: profile.nama,
-      detail: profile.detail,
       role: profile.role,
       jenis_absen: jenisAbsen,
       waktu: tapTime.toISOString()

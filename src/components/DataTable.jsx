@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Plus, Trash2, Edit2, Search, X, Loader2, ScanLine, Upload, Download, CheckSquare } from 'lucide-react';
 import Papa from 'papaparse';
 
-function DataTable({ table, masterTable, title, isLog = false }) {
+function DataTable({ table, masterTable, title, isLog = false, userType }) {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -56,10 +56,16 @@ function DataTable({ table, masterTable, title, isLog = false }) {
       
       const tablesToFetch = Array.isArray(table) ? table : [table];
       for (const tbl of tablesToFetch) {
-        const { data: lData } = await supabase.from(tbl)
+        let query = supabase.from(tbl)
           .select('*')
           .gte('waktu', startOfDay.toISOString())
           .lte('waktu', endOfDay.toISOString());
+          
+        if (userType && tbl === 'log_absensi') {
+          query = query.eq('user_type', userType);
+        }
+        
+        const { data: lData } = await query;
         if (lData) logData = [...logData, ...lData];
       }
 
