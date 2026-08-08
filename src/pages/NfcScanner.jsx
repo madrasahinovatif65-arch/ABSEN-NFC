@@ -411,7 +411,7 @@ function NfcScanner() {
   };
 
   const showResult = (data) => {
-    setResultData(data);
+    setResultData({ ...data, id: Date.now() });
     setViewState('result');
     
     if (standbyTimer.current) clearTimeout(standbyTimer.current);
@@ -527,7 +527,7 @@ function NfcScanner() {
             {/* Result State */}
             <div className={`absolute inset-0 flex flex-col justify-center items-center w-full h-full transition-all duration-500 ease-in-out bg-[#ffffff66] backdrop-blur-md ${viewState === 'result' ? 'opacity-100 scale-100' : 'opacity-0 scale-110 pointer-events-none'}`}>
               <div className={`w-[14vw] h-[14vw] rounded-full border-[0.5vw] overflow-hidden mb-[1.5vw] shadow-xl bg-white ${resultData?.warna.includes('text-red') ? 'border-[#ef4444]' : (resultData?.warna.includes('text-amber') ? 'border-[#f59e0b]' : 'border-[#059669]')}`}>
-                <img src={resultData?.foto} className="w-full h-full object-cover" alt="Avatar" onError={(e) => e.target.src=AVATAR_NETRAL} />
+                <img key={resultData?.id} src={resultData?.foto} className="w-full h-full object-cover" alt="Avatar" onError={(e) => e.target.src=AVATAR_NETRAL} />
               </div>
               
               <h2 className="text-[3vw] font-black text-slate-800 text-center leading-tight px-[1vw] max-w-[90%] break-words">
