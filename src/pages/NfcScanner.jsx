@@ -131,17 +131,23 @@ function NfcScanner() {
       try {
         const cache = {};
         
-        const resMurid = await supabase.from('murid').select('*');
-        if (resMurid.data) {
-          resMurid.data.forEach(p => {
-            cache[p.rfid_uid] = { ...p, role: 'murid' };
-          });
-        }
+        // Ambil seluruh data dari FDW master user (murid + guru dalam satu tabel)
+        const resMasterUser = await supabase
+          .from('fdw_master_user')
+          .select('rfid_uid, nama, detail, foto_url, role');
         
-        const resGuru = await supabase.from('guru').select('*');
-        if (resGuru.data) {
-          resGuru.data.forEach(p => {
-            cache[p.rfid_uid] = { ...p, role: 'guru' };
+        if (resMasterUser.error) throw resMasterUser.error;
+        
+        if (resMasterUser.data) {
+          resMasterUser.data.forEach(p => {
+            if (!p.rfid_uid) return;
+            cache[p.rfid_uid.toLowerCase().trim()] = {
+              rfid_uid : p.rfid_uid.toLowerCase().trim(),
+              nama     : p.nama     || 'Tanpa Nama',
+              detail   : p.detail   || '-',
+              foto_url : p.foto_url || '',
+              role     : p.role     || 'murid',
+            };
           });
         }
 
@@ -182,13 +188,13 @@ function NfcScanner() {
           // Hitung ulang dari local storage jika offline
           const keys = Object.keys(historyLokal.current);
           counterHarian.current = {
-            datang: keys.filter(k => k.endsWith('_datang')).length,
-            pulang: keys.filter(k => k.endsWith('_pulang')).length,
-            terlambat: keys.filter(k => k.endsWith('_terlambat')).length,
+            datang    : keys.filter(k => k.endsWith('_datang')).length,
+            pulang    : keys.filter(k => k.endsWith('_pulang')).length,
+            terlambat : keys.filter(k => k.endsWith('_terlambat')).length,
           };
         }
 
-        const total = (resMurid.data?.length || 0) + (resGuru.data?.length || 0);
+        const total = resMasterUser.data?.length || 0;
         setSyncStatus(`✓ Sistem Siap (${total} Data)`);
       } catch (err) {
         console.error("Gagal memuat profil/histori:", err);
