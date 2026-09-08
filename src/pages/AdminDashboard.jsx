@@ -1,130 +1,121 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Users, UserSquare2, Clock, History, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
-import AdminLogin from '../components/AdminLogin';
+import { LayoutDashboard, Users, Clock, History, LogOut, UserSquare2 } from 'lucide-react';
 import DataTable from '../components/DataTable';
 
 function AdminDashboard() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <AdminLogin onLogin={setIsAuthenticated} />;
-  }
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    window.location.href = '/admin-login';
+  };
 
   const navItems = [
     { path: '/admin', icon: <LayoutDashboard size={20} />, label: 'Dashboard', desc: 'Halaman Utama Admin' },
-    { path: '/admin/murid', icon: <Users size={20} />, label: 'Data Murid', desc: 'Kelola Master Murid' },
-    { path: '/admin/guru', icon: <UserSquare2 size={20} />, label: 'Data Guru', desc: 'Kelola Master Guru' },
+    { path: '/admin/murid', icon: <Users size={20} />, label: 'Data Murid', desc: 'Data Murid dari SIAKAD' },
+    { path: '/admin/guru', icon: <UserSquare2 size={20} />, label: 'Data Guru', desc: 'Data Guru dari SIAKAD' },
     { path: '/admin/absen-murid', icon: <Clock size={20} />, label: 'Absen Murid', desc: 'Log Kehadiran Murid' },
     { path: '/admin/absen-guru', icon: <History size={20} />, label: 'Absen Guru', desc: 'Log Kehadiran Guru' },
   ];
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
-      
-      {/* Mobile Header */}
-      <div className="md:hidden absolute top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-20 shadow-sm">
-        <Link to="/admin" className="flex items-center gap-3 active:opacity-70 transition-opacity">
-          <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center text-emerald-600 font-black text-sm">
-            <LayoutDashboard size={16} />
+    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+      {/* Sidebar */}
+      <aside className="w-full md:w-72 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20">
+        <div className="p-6 md:p-8 bg-slate-950/50 border-b border-slate-800 flex items-center gap-4">
+          <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
+            <LayoutDashboard size={24} />
           </div>
-          <h1 className="font-bold text-slate-800">Panel Admin</h1>
-        </Link>
-        <Link to="/" className="p-2 text-red-500 hover:bg-red-50 rounded-lg active:bg-red-100 transition-colors flex items-center gap-2 text-sm font-semibold">
-          <LogOut size={20} />
-          <span className="sr-only">Keluar</span>
-        </Link>
-      </div>
-
-      {/* Sidebar (Desktop Only) */}
-      <div className="hidden md:flex relative w-64 bg-white border-r border-slate-200 flex-col shadow-sm z-10">
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-          <Link to="/admin" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-black text-xl">
-              A
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-800 leading-tight">Panel Admin</h1>
-              <p className="text-xs text-slate-500">Madrasah Inovatif</p>
-            </div>
-          </Link>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Admin Panel</h1>
+            <p className="text-xs text-emerald-400 font-semibold mt-1 uppercase tracking-wider">MI Miftahul Khoir</p>
+          </div>
         </div>
-        
-        <nav className="flex-1 p-4 flex flex-col gap-2 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link 
-              key={item.path} 
-              to={item.path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${
-                location.pathname === item.path 
-                ? 'bg-emerald-50 text-emerald-600' 
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          ))}
+
+        <nav className="flex-1 px-4 py-6 md:py-8 overflow-y-auto space-y-2">
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-4">Menu Utama</div>
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-300 group ${
+                  isActive 
+                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' 
+                    : 'hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <div className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                  {item.icon}
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-semibold">{item.label}</span>
+                </div>
+              </Link>
+            );
+          })}
         </nav>
-        
-        <div className="p-4 border-t border-slate-100">
-          <Link 
-            to="/" 
-            className="flex items-center gap-3 px-4 py-3 rounded-xl font-semibold text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"
+
+        <div className="p-4 md:p-6 bg-slate-950/30 border-t border-slate-800">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-4 py-3.5 rounded-2xl font-semibold transition-all duration-300"
           >
             <LogOut size={20} />
-            Keluar ke Layar Tap
-          </Link>
+            Keluar Sistem
+          </button>
         </div>
-      </div>
+      </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative pt-16 md:pt-0">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-full h-64 bg-emerald-600 rounded-br-[100px] -z-10 opacity-10 pointer-events-none"></div>
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <Routes>
             <Route path="/" element={<WelcomeDashboard />} />
-            <Route path="/murid" element={<DataTable table="murid" title="Data Murid" />} />
-            <Route path="/guru" element={<DataTable table="guru" title="Data Guru" />} />
-            <Route path="/absen-murid" element={<DataTable table="log_absensi" userType="murid" masterTable="murid" title="Log Absensi Murid" isLog={true} />} />
-            <Route path="/absen-guru" element={<DataTable table="log_absensi" userType="guru" masterTable="guru" title="Log Absensi Guru" isLog={true} />} />
+            <Route path="/murid" element={<DataTable table="master_user" userType="murid" title="Data Murid (Read Only)" />} />
+            <Route path="/guru" element={<DataTable table="master_user" userType="guru" title="Data Guru (Read Only)" />} />
+            <Route path="/absen-murid" element={<DataTable table="log_absensi" userType="murid" masterTable="master_user" title="Log Absensi Murid" isLog={true} />} />
+            <Route path="/absen-guru" element={<DataTable table="log_absensi" userType="guru" masterTable="master_user" title="Log Absensi Guru" isLog={true} />} />
           </Routes>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
 function WelcomeDashboard() {
   const menus = [
-    { path: '/admin/murid', icon: <Users size={32} />, label: 'Data Murid', desc: 'Kelola database siswa', color: 'bg-blue-100 text-blue-600' },
-    { path: '/admin/guru', icon: <UserSquare2 size={32} />, label: 'Data Guru', desc: 'Kelola database guru', color: 'bg-indigo-100 text-indigo-600' },
+    { path: '/admin/murid', icon: <Users size={32} />, label: 'Data Murid', desc: 'Data Murid dari SIAKAD', color: 'bg-blue-100 text-blue-600' },
+    { path: '/admin/guru', icon: <UserSquare2 size={32} />, label: 'Data Guru', desc: 'Data Guru dari SIAKAD', color: 'bg-purple-100 text-purple-600' },
     { path: '/admin/absen-murid', icon: <Clock size={32} />, label: 'Absen Murid', desc: 'Rekap kehadiran siswa', color: 'bg-emerald-100 text-emerald-600' },
-    { path: '/admin/absen-guru', icon: <History size={32} />, label: 'Absen Guru', desc: 'Rekap kehadiran guru', color: 'bg-teal-100 text-teal-600' },
+    { path: '/admin/absen-guru', icon: <History size={32} />, label: 'Absen Guru', desc: 'Rekap kehadiran guru', color: 'bg-amber-100 text-amber-600' },
   ];
 
   return (
-    <div className="h-full flex flex-col items-center justify-center text-center p-4">
-      <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-6 shadow-sm rotate-3">
-        <LayoutDashboard size={40} className="-rotate-3" />
+    <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+        <div className="relative z-10 text-center md:text-left">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">Selamat Datang di Panel Admin 👋</h2>
+          <p className="text-slate-500 mt-2 text-sm md:text-base leading-relaxed max-w-2xl">
+            Kelola data master dan pantau log kehadiran (absensi) dari pemindaian NFC secara real-time. Pilih menu di bawah atau di samping untuk mulai bekerja.
+          </p>
+        </div>
       </div>
-      <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2">Selamat Datang di Panel Admin</h2>
-      <p className="text-slate-500 text-sm md:text-base max-w-md mb-10">
-        Pilih menu di bawah ini untuk mengelola data master atau melihat log absensi secara real-time.
-      </p>
 
-      <div className="grid grid-cols-2 gap-4 w-full max-w-2xl">
-        {menus.map(menu => (
-          <Link 
-            key={menu.path} 
-            to={menu.path}
-            className="flex flex-col items-center p-6 bg-white border border-slate-200 rounded-3xl shadow-sm hover:shadow-md hover:border-emerald-200 transition-all active:scale-[0.98] group"
-          >
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${menu.color}`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
+        {menus.map((menu, idx) => (
+          <Link key={idx} to={menu.path} className="group bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex flex-col items-start gap-4">
+            <div className={`p-4 rounded-2xl ${menu.color} group-hover:scale-110 transition-transform duration-300`}>
               {menu.icon}
             </div>
-            <h3 className="font-bold text-slate-800 mb-1">{menu.label}</h3>
-            <p className="text-xs text-slate-500 hidden md:block">{menu.desc}</p>
+            <div>
+              <h3 className="font-bold text-slate-800 text-lg group-hover:text-emerald-600 transition-colors">{menu.label}</h3>
+              <p className="text-slate-500 text-sm mt-1">{menu.desc}</p>
+            </div>
           </Link>
         ))}
       </div>
@@ -133,3 +124,4 @@ function WelcomeDashboard() {
 }
 
 export default AdminDashboard;
+
