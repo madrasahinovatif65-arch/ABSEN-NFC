@@ -48,8 +48,28 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
       let masterData = [];
       let logData = [];
       
-      const { data: mData } = await supabase.from(masterTable).select('*');
-      if (mData) masterData = mData;
+      const { data: mDataRaw, error: mErr } = await supabase.from(masterTable).select('*');
+      if (mErr) {
+        console.error("Fetch Master Data Error:", mErr);
+        alert("Gagal mengambil " + masterTable + " dari database: " + mErr.message);
+      }
+      if (mDataRaw) {
+        if (masterTable === 'master_user') {
+          masterData = mDataRaw.map(p => ({
+            ...p,
+            rfid_uid: p.rfid,
+            detail: p.role === 'Murid' ? p.rombel : (p.mapel && p.mapel !== '-' ? p.mapel : p.role),
+            foto_url: p.foto
+          }));
+          if (userType === 'murid') {
+            masterData = masterData.filter(p => p.role === 'Murid');
+          } else if (userType === 'guru') {
+            masterData = masterData.filter(p => p.role !== 'Murid');
+          }
+        } else {
+          masterData = mDataRaw;
+        }
+      }
 
       const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
@@ -98,8 +118,30 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
       setData(combined);
     } else {
       const targetTable = Array.isArray(table) ? table[0] : table;
-      const { data: result } = await supabase.from(targetTable).select('*').order('nama', { ascending: true });
-      if (result) setData(result);
+      const { data: resultRaw, error: fetchErr } = await supabase.from(targetTable).select('*').order('nama', { ascending: true });
+      if (fetchErr) {
+        console.error("Fetch Data Error:", fetchErr);
+        alert("Gagal mengambil data dari database: " + fetchErr.message);
+      }
+      if (resultRaw) {
+        if (targetTable === 'master_user') {
+          let mappedData = resultRaw.map(p => ({
+            ...p,
+            rfid_uid: p.rfid,
+            detail: p.role === 'Murid' ? p.rombel : (p.mapel && p.mapel !== '-' ? p.mapel : p.role),
+            foto_url: p.foto
+          }));
+          
+          if (userType === 'murid') {
+            mappedData = mappedData.filter(p => p.role === 'Murid');
+          } else if (userType === 'guru') {
+            mappedData = mappedData.filter(p => p.role !== 'Murid');
+          }
+          setData(mappedData);
+        } else {
+          setData(resultRaw);
+        }
+      }
     }
     
     setLoading(false);
@@ -609,3 +651,4 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
 }
 
 export default DataTable;
+
