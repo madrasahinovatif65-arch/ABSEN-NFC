@@ -1,3 +1,63 @@
+// =========================================================================
+// KONFIGURASI SUPABASE
+// =========================================================================
+var SUPABASE_URL = 'https://yfsemhbuzxdhysglocgh.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlmc2VtaGJ1enhkaHlzZ2xvY2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU5OTE3ODIsImV4cCI6MjEwMTU2Nzc4Mn0.GLqDofMptgxB_eeKtwBONcQle1r-F0pjvPg0pqyyP4Y';
+
+function getSupabaseHeaders_() {
+  return {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal'
+  };
+}
+
+// Helper: GET request ke Supabase REST API
+function supabaseGet_(endpoint) {
+  try {
+    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + endpoint, {
+      'method': 'get',
+      'headers': getSupabaseHeaders_(),
+      'muteHttpExceptions': true
+    });
+    if (res.getResponseCode() === 200) {
+      return JSON.parse(res.getContentText());
+    } else {
+      Logger.log('Supabase GET error [' + endpoint + ']: ' + res.getContentText());
+      return null;
+    }
+  } catch(e) {
+    Logger.log('Supabase GET exception: ' + e.toString());
+    return null;
+  }
+}
+
+// Helper: POST request ke Supabase REST API
+function supabasePost_(tableName, payload) {
+  try {
+    var res = UrlFetchApp.fetch(SUPABASE_URL + '/rest/v1/' + tableName, {
+      'method': 'post',
+      'headers': getSupabaseHeaders_(),
+      'payload': JSON.stringify(payload),
+      'muteHttpExceptions': true
+    });
+    var code = res.getResponseCode();
+    if (code >= 200 && code < 300) {
+      return true;
+    } else {
+      Logger.log('Supabase POST error [' + tableName + ']: ' + res.getContentText());
+      return false;
+    }
+  } catch(e) {
+    Logger.log('Supabase POST exception: ' + e.toString());
+    return false;
+  }
+}
+
+// =========================================================================
+// WEB APP ENTRY POINT
+// =========================================================================
 function doGet(e) {
   return HtmlService.createTemplateFromFile('Index')
       .evaluate()
@@ -6,161 +66,177 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// =========================================================================
+// UNDUH DATABASE MASTER USER DARI SUPABASE (FDW fdw_master_user)
+// Dipanggil oleh Index.html saat pertama kali load untuk cache lokal.
+// Tabel: fdw_master_user (kolom: rfid_uid, nama, detail, foto_url, role)
+// =========================================================================
 function downloadDatabaseMurid() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
   var dbLokal = {};
-  
-  // 1. Membaca Data Murid (Pastikan sheet Siswa sudah Anda rename menjadi Murid)
-  var sheetMurid = ss.getSheetByName("Murid");
-  if (sheetMurid) {
-    var dataMurid = sheetMurid.getDataRange().getValues();
-    for (var i = 1; i < dataMurid.length; i++) {
-      var uid = dataMurid[i][0].toString().toLowerCase();
-      var linkFoto = dataMurid[i][3] ? dataMurid[i][3].toString().trim() : "";
-      
-      dbLokal[uid] = { 
-        nama: dataMurid[i][1], 
-        kelas: dataMurid[i][2],
-        foto: linkFoto,
-        role: "murid"
-      };
-    }
+
+  // Query seluruh data dari FDW fdw_master_user
+  var data = supabaseGet_('fdw_master_user?select=rfid_uid,nama,detail,foto_url,role');
+
+  if (!data || data.length === 0) {
+    Logger.log('Peringatan: Tidak ada data dari tabel master_user.');
+    return dbLokal;
   }
 
-  // 2. Membaca Data Guru
-  var sheetGuru = ss.getSheetByName("Guru");
-  if (sheetGuru) {
-    var dataGuru = sheetGuru.getDataRange().getValues();
-    for (var j = 1; j < dataGuru.length; j++) {
-      var uidGuru = dataGuru[j][0].toString().toLowerCase();
-      var linkFotoGuru = dataGuru[j][3] ? dataGuru[j][3].toString().trim() : "";
-      
-      dbLokal[uidGuru] = { 
-        nama: dataGuru[j][1], 
-        kelas: dataGuru[j][2], 
-        foto: linkFotoGuru,
-        role: "guru"
-      };
-    }
+  for (var i = 0; i < data.length; i++) {
+    var user = data[i];
+    if (!user.rfid_uid) continue;
+    var uid = user.rfid_uid.toString().toLowerCase().trim();
+    dbLokal[uid] = {
+      nama: user.nama || 'Tanpa Nama',
+      kelas: user.detail || '-',
+      foto: user.foto_url || '',
+      role: user.role || 'murid'
+    };
   }
-  
+
+  Logger.log('Database master_user berhasil diunduh: ' + Object.keys(dbLokal).length + ' pengguna.');
   return dbLokal;
 }
 
+// =========================================================================
+// PROSES ABSENSI DARI WEB (dipanggil oleh Index.html via google.script.run)
+// Lookup user dari Supabase FDW master_user, lalu simpan log ke Supabase.
+// Status yang dicatat: Datang, Terlambat, Pulang
+// =========================================================================
 function prosesAbsenWeb(uidInput) {
   var lock = LockService.getScriptLock();
-  
+
   if (!lock.tryLock(5000)) {
     return { "status": "failed", "nama": "Sistem Sibuk", "kelas": "-", "message": "Mohon tap ulang", "foto": "https://cdn-icons-png.flaticon.com/512/1828/1828843.png" };
   }
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
     var waktuSekarang = new Date();
     var tz = Session.getScriptTimeZone();
-    
-    var dataUser = null;
-    var isGuru = false;
-    
-    // Cari pengguna di sheet Murid
-    var sheetMurid = ss.getSheetByName("Murid");
-    if (sheetMurid) {
-      var dataMurid = sheetMurid.getDataRange().getValues();
-      for (var i = 1; i < dataMurid.length; i++) {
-        if (dataMurid[i][0].toString().toLowerCase() === uidInput.toString().toLowerCase()) {
-          dataUser = { nama: dataMurid[i][1], detail: dataMurid[i][2] };
-          break;
-        }
-      }
-    }
-    
-    // Jika tidak ketemu di Murid, cari di sheet Guru
-    if (!dataUser) {
-      var sheetGuru = ss.getSheetByName("Guru");
-      if (sheetGuru) {
-        var dataGuru = sheetGuru.getDataRange().getValues();
-        for (var j = 1; j < dataGuru.length; j++) {
-          if (dataGuru[j][0].toString().toLowerCase() === uidInput.toString().toLowerCase()) {
-            dataUser = { nama: dataGuru[j][1], detail: dataGuru[j][2] };
-            isGuru = true;
-            break;
-          }
-        }
-      }
-    }
-    
-    if (dataUser) {
-      // LOGIKA WAKTU
-      var jamStr = Utilities.formatDate(waktuSekarang, tz, "HH:mm");
-      var bagianJam = jamStr.split(":");
-      var jamDesimal = parseInt(bagianJam[0]) + (parseInt(bagianJam[1]) / 60); 
-      
-      var tanggalHariIni = Utilities.formatDate(waktuSekarang, tz, "yyyy-MM-dd");
-      var hariID = waktuSekarang.getDay(); 
-      
-      // Filter Libur Guru
-      if (isGuru && hariID === 0) {
-        return { "status": "failed", "nama": dataUser.nama, "message": "Hari Minggu Libur!", "foto": "https://cdn-icons-png.flaticon.com/512/1828/1828843.png" };
-      }
-      
-      var batasDatang = 7; 
-      var batasPulang = 9; // Default murid
-      if (isGuru) {
-        batasPulang = (hariID === 5) ? 10.5 : 12.0; 
-      }
-      
-      // Pilih Sheet Target Berdasarkan Peran
-      var sheetDatang = isGuru ? ss.getSheetByName("Absensi_Guru_Datang") : ss.getSheetByName("Absensi_Datang");
-      var sheetPulang = isGuru ? ss.getSheetByName("Absensi_Guru_Pulang") : ss.getSheetByName("Absensi_Pulang");
-      
-      var sudahDatang = false;
-      var sudahPulang = false;
-      
-      if (sheetDatang && sheetDatang.getLastRow() > 0) {
-        var dataDatang = sheetDatang.getDataRange().getValues();
-        for (var d = dataDatang.length - 1; d > 0; d--) {
-          var rowDateStr = Utilities.formatDate(new Date(dataDatang[d][0]), tz, "yyyy-MM-dd");
-          if (rowDateStr !== tanggalHariIni) break;
-          
-          if (dataDatang[d][1].toString().toLowerCase() === uidInput.toString().toLowerCase()) {
-            sudahDatang = true; break;
-          }
-        }
-      }
-      
-      if (sheetPulang && sheetPulang.getLastRow() > 0) {
-        var dataPulang = sheetPulang.getDataRange().getValues();
-        for (var p = dataPulang.length - 1; p > 0; p--) {
-          var rowDateStrPulang = Utilities.formatDate(new Date(dataPulang[p][0]), tz, "yyyy-MM-dd");
-          if (rowDateStrPulang !== tanggalHariIni) break;
-          
-          if (dataPulang[p][1].toString().toLowerCase() === uidInput.toString().toLowerCase()) {
-            sudahPulang = true; break;
-          }
-        }
-      }
-      
-      var jenisAbsenTercatat = "";
-      
-      if (jamDesimal <= batasDatang) {
-        if (sudahDatang) return { "status": "failed", "nama": dataUser.nama, "message": "Sudah absen DATANG!", "foto": "https://cdn-icons-png.flaticon.com/512/1828/1828843.png" };
-        jenisAbsenTercatat = "Datang";
-        sheetDatang.appendRow([waktuSekarang, uidInput, dataUser.nama, dataUser.detail, jenisAbsenTercatat]);
-        
-      } else if (jamDesimal > batasDatang && jamDesimal < batasPulang) {
-        return { "status": "failed", "nama": dataUser.nama, "message": "Terlambat! Izin Pimpinan.", "foto": "https://cdn-icons-png.flaticon.com/512/1828/1828843.png" };
-        
-      } else if (jamDesimal >= batasPulang) {
-        if (sudahPulang) return { "status": "failed", "nama": dataUser.nama, "message": "Sudah absen PULANG!", "foto": "https://cdn-icons-png.flaticon.com/512/1828/1828843.png" };
-        jenisAbsenTercatat = "Pulang";
-        sheetPulang.appendRow([waktuSekarang, uidInput, dataUser.nama, dataUser.detail, jenisAbsenTercatat]);
-      }
-      
-      return { "status": "success", "nama": dataUser.nama, "kelas": dataUser.detail, "message": "Berhasil Absen " + jenisAbsenTercatat, "foto": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" };
-      
-    } else {
+    var uidLower = uidInput.toString().toLowerCase().trim();
+
+    // ------------------------------------------------------------------
+    // 1. CARI USER DI SUPABASE (FDW fdw_master_user)
+    // ------------------------------------------------------------------
+    var userData = supabaseGet_(
+      'fdw_master_user?rfid_uid=eq.' + encodeURIComponent(uidLower) +
+      '&select=rfid_uid,nama,detail,foto_url,role&limit=1'
+    );
+
+    if (!userData || userData.length === 0) {
       return { "status": "failed", "nama": "Kartu Tidak Terdaftar!", "kelas": "-", "message": "Hubungi Admin", "foto": "https://cdn-icons-png.flaticon.com/512/1828/1828843.png" };
     }
+
+    var user = userData[0];
+    var namaUser   = user.nama   || 'Tanpa Nama';
+    var detailUser = user.detail || '-';
+    var fotoUser   = user.foto_url || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+    var isGuru     = (user.role === 'guru');
+
+    // ------------------------------------------------------------------
+    // 2. LOGIKA WAKTU
+    // ------------------------------------------------------------------
+    var jamStr    = Utilities.formatDate(waktuSekarang, tz, 'HH:mm');
+    var bagianJam = jamStr.split(':');
+    var jamDesimal = parseInt(bagianJam[0]) + (parseInt(bagianJam[1]) / 60);
+
+    var tanggalHariIni = Utilities.formatDate(waktuSekarang, tz, 'yyyy-MM-dd');
+    var hariID = waktuSekarang.getDay(); // 0=Minggu, 5=Jumat
+
+    // Guru libur hari Minggu
+    if (isGuru && hariID === 0) {
+      return { "status": "failed", "nama": namaUser, "kelas": detailUser, "message": "Hari Minggu Libur!", "foto": fotoUser };
+    }
+
+    var batasDatang = 7.0;  // 07:00 - batas akhir absen datang
+    var batasPulang = isGuru ? ((hariID === 5) ? 10.5 : 12.0) : 9.0;
+
+    // ------------------------------------------------------------------
+    // 3. CEK DUPLIKASI ABSENSI HARI INI DI SUPABASE
+    //    Tabel log_absensi: rfid_uid, nama, detail, role, jenis_absen, waktu
+    // ------------------------------------------------------------------
+    var tanggalMulai = tanggalHariIni + 'T00:00:00.000Z';
+    var tanggalAkhir = tanggalHariIni + 'T23:59:59.999Z';
+
+    var logHariIni = supabaseGet_(
+      'log_absensi?rfid_uid=eq.' + encodeURIComponent(uidLower) +
+      '&waktu=gte.' + tanggalMulai +
+      '&waktu=lte.' + tanggalAkhir +
+      '&select=jenis_absen'
+    );
+
+    var sudahDatang  = false;
+    var sudahPulang  = false;
+
+    if (logHariIni && logHariIni.length > 0) {
+      for (var k = 0; k < logHariIni.length; k++) {
+        var jenis = logHariIni[k].jenis_absen;
+        if (jenis === 'Datang' || jenis === 'Terlambat') sudahDatang = true;
+        if (jenis === 'Pulang') sudahPulang = true;
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 4. TENTUKAN JENIS ABSEN & VALIDASI
+    // ------------------------------------------------------------------
+    var jenisAbsen = '';
+
+    if (jamDesimal <= batasDatang) {
+      // Jam datang normal (≤ 07:00)
+      if (sudahDatang) {
+        return { "status": "failed", "nama": namaUser, "kelas": detailUser, "message": "Sudah absen DATANG!", "foto": fotoUser };
+      }
+      jenisAbsen = 'Datang';
+
+    } else if (jamDesimal > batasDatang && jamDesimal < batasPulang) {
+      // Jam terlambat (07:01 - batas pulang) → DICATAT sebagai Terlambat
+      if (sudahDatang) {
+        return { "status": "failed", "nama": namaUser, "kelas": detailUser, "message": "Sudah absen DATANG!", "foto": fotoUser };
+      }
+      jenisAbsen = 'Terlambat';
+
+    } else if (jamDesimal >= batasPulang) {
+      // Jam pulang
+      if (sudahPulang) {
+        return { "status": "failed", "nama": namaUser, "kelas": detailUser, "message": "Sudah absen PULANG!", "foto": fotoUser };
+      }
+      if (!sudahDatang) {
+        // Pulang tanpa pernah datang — tetap dicatat
+        jenisAbsen = 'Pulang';
+      } else {
+        jenisAbsen = 'Pulang';
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 5. SIMPAN LOG ABSENSI KE SUPABASE (tabel log_absensi)
+    // ------------------------------------------------------------------
+    var payloadLog = {
+      rfid_uid   : uidLower,
+      nama       : namaUser,
+      detail     : detailUser,
+      role       : user.role || 'murid',
+      jenis_absen: jenisAbsen,
+      waktu      : waktuSekarang.toISOString()
+    };
+
+    var berhasil = supabasePost_('log_absensi', payloadLog);
+
+    if (!berhasil) {
+      return { "status": "failed", "nama": namaUser, "kelas": detailUser, "message": "Gagal simpan log. Coba lagi.", "foto": fotoUser };
+    }
+
+    // ------------------------------------------------------------------
+    // 6. KEMBALIKAN HASIL KE LAYAR
+    // ------------------------------------------------------------------
+    var pesanStatus = 'Berhasil Absen ' + jenisAbsen;
+    return {
+      "status" : "success",
+      "nama"   : namaUser,
+      "kelas"  : detailUser,
+      "message": pesanStatus,
+      "foto"   : fotoUser
+    };
 
   } finally {
     lock.releaseLock();
