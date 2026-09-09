@@ -132,11 +132,18 @@ function NfcScanner() {
         const cache = {};
         
         // Ambil seluruh data dari FDW master user (murid + guru dalam satu tabel)
-        const resMasterUser = await supabase
+        let resMasterUser = await supabase
           .from('fdw_master_user')
           .select('rfid_uid, nama, detail, foto_url, role');
         
-        if (resMasterUser.error) throw resMasterUser.error;
+        if (resMasterUser.error) {
+          console.warn("Gagal membaca fdw_master_user, mencoba fallback ke master_user view...", resMasterUser.error);
+          resMasterUser = await supabase
+            .from('master_user')
+            .select('rfid_uid, nama, detail, foto_url, role');
+            
+          if (resMasterUser.error) throw resMasterUser.error;
+        }
         
         if (resMasterUser.data) {
           resMasterUser.data.forEach(p => {
