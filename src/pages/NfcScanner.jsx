@@ -134,25 +134,30 @@ function NfcScanner() {
         // Ambil seluruh data dari FDW master user (murid + guru dalam satu tabel)
         let resMasterUser = await supabase
           .from('fdw_master_user')
-          .select('rfid_uid, nama, detail, foto_url, role');
+          .select('*');
         
         if (resMasterUser.error) {
           console.warn("Gagal membaca fdw_master_user, mencoba fallback ke master_user view...", resMasterUser.error);
           resMasterUser = await supabase
             .from('master_user')
-            .select('rfid_uid, nama, detail, foto_url, role');
+            .select('*');
             
           if (resMasterUser.error) throw resMasterUser.error;
         }
         
         if (resMasterUser.data) {
           resMasterUser.data.forEach(p => {
-            if (!p.rfid_uid) return;
-            cache[p.rfid_uid.toLowerCase().trim()] = {
-              rfid_uid : p.rfid_uid.toLowerCase().trim(),
+            const mappedUid = p.rfid_uid || p.rfid || '';
+            if (!mappedUid) return;
+            
+            const mappedDetail = p.detail || (p.role === 'Murid' ? p.rombel : (p.mapel && p.mapel !== '-' ? p.mapel : p.role)) || '-';
+            const mappedFoto = p.foto_url || p.foto || '';
+
+            cache[mappedUid.toLowerCase().trim()] = {
+              rfid_uid : mappedUid.toLowerCase().trim(),
               nama     : p.nama     || 'Tanpa Nama',
-              detail   : p.detail   || '-',
-              foto_url : p.foto_url || '',
+              detail   : mappedDetail,
+              foto_url : mappedFoto,
               role     : p.role     || 'murid',
             };
           });
