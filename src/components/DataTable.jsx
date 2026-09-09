@@ -32,7 +32,7 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
 
   useEffect(() => {
     fetchData();
-  }, [table, selectedDate, masterTable]);
+  }, [table, selectedDate, masterTable, userType]);
 
   useEffect(() => {
     if (isModalOpen && isScanning && scanInputRef.current) {
