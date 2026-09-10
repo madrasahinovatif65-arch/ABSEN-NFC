@@ -11,7 +11,12 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
   const [search, setSearch] = useState('');
   const [filterKelas, setFilterKelas] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    // Mendapatkan tanggal hari ini di GMT+7
+    const now = new Date();
+    const gmt7Time = now.getTime() + (now.getTimezoneOffset() * 60000) + (7 * 3600000);
+    return new Date(gmt7Time).toISOString().split('T')[0];
+  });
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,17 +76,21 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
         }
       }
 
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Mengatur rentang waktu pencarian berdasarkan GMT+7
+      const dateParts = selectedDate.split('-');
+      const year = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10) - 1;
+      const day = parseInt(dateParts[2], 10);
+
+      const startOfDayUTC = new Date(Date.UTC(year, month, day, -7, 0, 0, 0));
+      const endOfDayUTC = new Date(Date.UTC(year, month, day, 16, 59, 59, 999));
       
       const tablesToFetch = Array.isArray(table) ? table : [table];
       for (const tbl of tablesToFetch) {
         let query = supabase.from(tbl)
           .select('*')
-          .gte('waktu', startOfDay.toISOString())
-          .lte('waktu', endOfDay.toISOString());
+          .gte('waktu', startOfDayUTC.toISOString())
+          .lte('waktu', endOfDayUTC.toISOString());
           
         if (userType && tbl === 'log_absensi') {
           query = query.eq('user_type', userType);
@@ -473,7 +482,7 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
                       <td className="px-6 py-4 text-sm">
                         {row.datang ? (
                           <div className="flex flex-col">
-                            <span className="text-emerald-700 font-bold">{new Date(row.datang.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                            <span className="text-emerald-700 font-bold">{new Date(row.datang.waktu).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                             {row.datang.jenis_absen === 'Terlambat' && <span className="text-[10px] text-amber-700 font-bold bg-amber-100 rounded-md px-2 py-0.5 w-max mt-1 uppercase tracking-wider">Terlambat</span>}
                           </div>
                         ) : (
@@ -482,7 +491,7 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
                       </td>
                       <td className="px-6 py-4 text-sm">
                         {row.pulang ? (
-                          <span className="text-blue-700 font-bold">{new Date(row.pulang.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                          <span className="text-blue-700 font-bold">{new Date(row.pulang.waktu).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                         ) : row.datang ? (
                           <span className="text-amber-600 font-bold bg-amber-50 border border-amber-200 rounded-md px-2 py-1 text-xs">Belum Tap Pulang</span>
                         ) : (
