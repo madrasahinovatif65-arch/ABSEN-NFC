@@ -93,7 +93,14 @@ function DataTable({ table, masterTable, title, isLog = false, userType }) {
           .lte('waktu', endOfDayUTC.toISOString());
           
         if (userType && tbl === 'log_absensi') {
-          query = query.eq('user_type', userType);
+          // user_type di DB disimpan dengan kapital ('Murid', 'Guru Mapel', 'Wali Kelas', dll.)
+          // Sesuaikan filter agar cocok dengan data yang ada di tabel
+          if (userType === 'murid') {
+            query = query.eq('user_type', 'Murid');
+          } else {
+            // Semua role selain 'Murid' dianggap sebagai guru/staff
+            query = query.neq('user_type', 'Murid');
+          }
         }
         
         const { data: lData } = await query;
